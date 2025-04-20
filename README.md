@@ -7,6 +7,13 @@ Human centric public policy research platform supported by generative ai and age
 Wonky is an app that is aimed at people who need to understand the impacts of new policy, or researching new avenues for policy development.
 The goal is to build a platform for government officials, public policy researchers, and those who are just curious in exploring the world of policy research.
 
+The initial sources for this are CRS Reports and Wikipedia. CRS Reports are of very high quality analysis and providing 
+lots of contextual information. Wikipedia is useful for further exploration or filling in gaps, but hardly an authoritative source.
+Combining the two, and maintaining clear distinctions between the sources (and any additional sources), can provide both 
+intuitive trust in the system by clearly defining the sources of information.
+
+https://www.everycrsreport.com/
+
 ## What are Yargs?
 There are so many gen ai products aimed at chatting with documents and creating personal RAGs off of your 
 existing documents that it might seem that we don't need Yet-Another-RAG (Yargs) or Chat-With-My-Documents.
@@ -36,6 +43,8 @@ for automated fact checking, reviewing, and other common human processes during 
    - Human reviewable checks on the workflow's process
    - Providing branching points for researchers to start from for new research without rerunning an entire workflow
 - Tasks that agents perform should represent the translation of knowledge and information from one source to another, not a cognitive process or "thinking" done by an LLM since these cannot be verified as being related at all to the final output.
+- Citations cannot be arbitrary
+  - Citations that are arbitrary sections can be helpful for tracing the source of information, but releasing the control of citations means being locked into chunking strategies within an index, the whim of an llm, and a single universal structure for all information (this is just patently false). 
 
 ### To do this we must think of workflows and documents as structured documents, not prose
 Key to this concept is that a workflow does not necessarily terminate in the final document.
