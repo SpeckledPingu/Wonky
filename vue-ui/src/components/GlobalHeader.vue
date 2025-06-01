@@ -5,7 +5,7 @@
         <div class="flex items-center">
           <router-link to="/" class="flex items-center text-indigo-600 hover:text-indigo-700">
             <Rocket class="h-8 w-8 mr-2" />
-            <span class="font-bold text-xl text-gray-800">ResearchFlow</span>
+            <span class="font-bold text-xl text-gray-800">Wonky</span>
           </router-link>
         </div>
 
