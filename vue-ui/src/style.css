@@ -1,0 +1,62 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #f8f9fa; /* A light gray background similar to screenshots */
+  color: #333;
+}
+
+#app {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+}
+
+/* Basic button styling to be customized further */
+.btn {
+  @apply py-2 px-4 rounded-md font-semibold shadow-sm focus:outline-none focus:ring-2 focus:ring-offset-2;
+}
+.btn-primary {
+  @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500;
+}
+.btn-secondary {
+  @apply bg-gray-200 text-gray-700 hover:bg-gray-300 focus:ring-gray-400;
+}
+.btn-success {
+  @apply bg-green-500 text-white hover:bg-green-600 focus:ring-green-400;
+}
+.btn-danger {
+  @apply bg-red-500 text-white hover:bg-red-600 focus:ring-red-400;
+}
+
+/* Card styling */
+.card {
+  @apply bg-white shadow-lg rounded-lg p-6;
+}
+
+/* Input styling */
+input[type="text"],
+input[type="search"],
+textarea,
+select {
+  @apply block w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm;
+}
+
+/* Custom scrollbar for webkit browsers */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: #f1f1f1;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb {
+  background: #c1c1c1;
+  border-radius: 10px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: #a1a1a1;
+}
