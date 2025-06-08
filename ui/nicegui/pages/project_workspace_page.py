@@ -369,7 +369,7 @@ async def create_project_workspace_content(project_id: str, stream_id: str) -> N
                     f"You can now manually refresh relevant sections if needed (e.g., Papers list).",
                     type=message_type, multi_line=True, close_button='OK')
             page_ui_state['last_action_completed_details'] = None
-    ui.timer(interval=0.5, callback=notify_on_action_completion, active=True)
+    ui.timer(interval=5, callback=notify_on_action_completion, active=True)
 
     async def handle_clear_chat():
         with ui.dialog() as dialog, ui.card():
@@ -545,7 +545,7 @@ async def create_project_workspace_content(project_id: str, stream_id: str) -> N
                                     print(f"Request error checking new papers: {e}")
                                     # Potentially notify user
 
-                            ui.timer(interval=2, callback=check_new_papers, active=True)
+                            ui.timer(interval=10, callback=check_new_papers, active=True)
                             await papers_list_display_left_panel()
                             page_ui_state['papers_list_display_left_panel_ref'] = papers_list_display_left_panel
 

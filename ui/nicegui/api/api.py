@@ -153,6 +153,7 @@ async def get_streams_for_project(project_id: str, conn: sqlite3.Connection = De
             ORDER BY subject;
         """, (project_id,))
         rows = cursor.fetchall()
+        print(rows)
         return [_dict_from_row(row) for row in rows]
     except sqlite3.Error as e:
         raise HTTPException(status_code=500, detail=f"Database error loading streams: {e}")
@@ -222,17 +223,33 @@ async def get_stream_details(stream_id: str, conn: sqlite3.Connection = Depends(
 
 @app.get("/projects/{project_id}/streams/{stream_id}/papers", response_model=List[Paper])
 async def load_papers_for_stream(project_id: str, stream_id: str, conn: sqlite3.Connection = Depends(get_db_connection)):
+    print('getting papers!')
     try:
+        print(project_id)
+        print(stream_id)
         cursor = conn.cursor()
-        cursor.execute("""
-                       SELECT id, project_id, stream_id, title, content, added_at
-                       FROM papers
-                       WHERE project_id = ? AND stream_id = ?
-                       ORDER BY added_at DESC;
-                       """, (project_id, stream_id)) # Corrected to filter by stream_id as well
+        if stream_id == 'general':
+            print('general stream')
+            cursor.execute("""
+                           SELECT id, project_id, stream_id, title, content, added_at
+                           FROM papers
+                           WHERE project_id = ?
+                           ORDER BY added_at DESC;
+                               """, (project_id, ))
+        else:
+            print('specific stream')
+            cursor.execute("""
+                           SELECT id, project_id, stream_id, title, content, added_at
+                           FROM papers
+                           WHERE project_id = ?
+                             AND stream_id = ?
+                           ORDER BY added_at DESC;
+                           """, (project_id, stream_id))
+
         rows = cursor.fetchall()
         return [_dict_from_row(row) for row in rows]
     except sqlite3.Error as e:
+        print(e)
         raise HTTPException(status_code=500, detail=f"Database error: {e}")
     finally:
         if conn:
@@ -264,12 +281,23 @@ async def add_paper_to_stream(project_id: str, stream_id: str, paper_data: Paper
 async def load_new_papers_for_stream(project_id: str, stream_id: str, conn: sqlite3.Connection = Depends(get_db_connection)):
     try:
         cursor = conn.cursor()
-        cursor.execute("""
-                       SELECT id, project_id, stream_id, title, content, added_at, is_new
-                       FROM papers
-                       WHERE project_id = ? AND stream_id = ? AND is_new = 1
-                       ORDER BY added_at DESC;
-                       """, (project_id, stream_id)) # Corrected to filter by stream_id as well
+        if stream_id == 'general':
+            print('general')
+            cursor.execute("""
+                           SELECT id, project_id, stream_id, title, content, added_at, is_new
+                           FROM papers
+                           WHERE project_id = ?
+                             AND is_new = 1
+                           ORDER BY added_at DESC;
+                           """, (project_id, ))
+        else:
+            print(stream_id)
+            cursor.execute("""
+                           SELECT id, project_id, stream_id, title, content, added_at, is_new
+                           FROM papers
+                           WHERE project_id = ? AND stream_id = ? AND is_new = 1
+                           ORDER BY added_at DESC;
+                           """, (project_id, stream_id)) # Corrected to filter by stream_id as well
         rows = cursor.fetchall()
         print(len([_dict_from_row(row) for row in rows]))
         return [_dict_from_row(row) for row in rows]
