@@ -4,11 +4,31 @@ import uuid
 from datetime import datetime
 from typing import List, Optional, Dict, Any
 
-from fastapi import FastAPI, HTTPException, Depends, Query
+from fastapi import FastAPI, HTTPException, Depends, Query, BackgroundTasks
 from pydantic import BaseModel, Field
+import lancedb
+from uuid import uuid4
+from sentence_transformers import SentenceTransformer
+from pathlib import Path
+from dotenv import load_dotenv
+
+load_dotenv('env_var')
+
+import os
+print(os.environ)
+
+from workflows.structured_documents.structured_crs_report_analysis_burr import structured_csr_report_build
+from workflows.structured_documents.structured_crs_report_analysis_burr import analysis_types as CRS_analysis_types
+from workflows.structured_documents.structured_wikipedia_report_analysis_wikipedia_burr import structured_wikipedia_report_build
+from workflows.structured_documents.structured_wikipedia_report_analysis_wikipedia_burr import analysis_types as WIKIPEDIA_analysis_types
 
 # --- Database Configuration ---
-DB_FILE = '../ui_data.sqlite'
+DB_FILE = 'ui/ui_data.sqlite'
+_ = Path(DB_FILE)
+print(_.resolve())
+encoder = SentenceTransformer('nomic-ai/nomic-embed-text-v1.5', device='mps', trust_remote_code=True)
+
+RESEARCH_FILE = '../project_research/research.sqlite'
 
 def get_db_connection():
     conn = sqlite3.connect(DB_FILE, check_same_thread=False)
@@ -101,6 +121,11 @@ class PromptLibraryItem(PromptLibraryItemBase):
     created_at: datetime
     updated_at: datetime
 
+class ResearchStreamTopic(BaseModel):
+    subject_matter: str
+    focus: str
+
+
 app = FastAPI()
 
 # --- Helper Functions ---
@@ -124,6 +149,184 @@ def _format_chat_message_timestamps(msg_dict: Dict[str, Any]) -> Dict[str, Any]:
         msg_dict['timestamp_display'] = dt_obj.strftime('%H:%M')
         msg_dict['timestamp_full'] = dt_obj.isoformat()
     return msg_dict
+
+
+def insert_new_research_paper(document_id, title, content, document_type, project_id, stream_id, cursor, conn):
+    added_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    cursor.execute("""
+                    INSERT OR REPLACE INTO papers (id, project_id, stream_id, title, content, added_at, is_new)
+                    VALUES (?, ?, ?, ?, ?, ?, ?)
+                    RETURNING id, project_id, title, added_at;
+                    """, (document_id, project_id, stream_id, title, content, added_at, 1))
+    row = cursor.fetchone()
+    conn.commit()
+    return row
+
+## Alter the table to add document_type
+
+def insert_into_research_stream(id, project_id, subject, focus, project_created_at, cursor, conn):
+    row = cursor.execute("""SELECT * from research_streams
+                     WHERE project_id = ? AND id = ? AND subject = ? AND focus = ?""",
+                  (project_id, id, subject, focus)).fetchone()
+    if len(row) == 0:
+        cursor.execute("""
+                      INSERT OR REPLACE INTO research_streams (id, project_id, subject, focus, created_at)
+                      VALUES (?, ?, ?, ?, ?)
+                      RETURNING id, project_id, subject, focus, created_at;
+                      """,
+                      (id, project_id, subject, focus, project_created_at)
+                      )
+        row = cursor.fetchone()
+        conn.commit()
+    return row
+
+
+# --- Generation Endpoints ---
+def generate_crs_report(subject_matter: str, focus: str, project_id: str, stream_id: str):
+    run_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    run_id = str(uuid4())
+    # project_id = str(uuid4())
+    # project_id = 'proj_alpha_01'
+    # stream_id = 'general'
+    crs_source_dataset = 'CRSReports'
+    wikipedia_source_dataset = 'Wikipedia'
+    # subject_matter = "Rural Broadband in America."
+    # focus = "Historical, current, and future challenges for rural broadband and connectivity in America."
+
+    analysis_type = 'domestic_policy'
+    analysis_prompts = CRS_analysis_types[analysis_type]
+
+    project_folder = Path('project_research')
+    project_folder.mkdir(parents=True, exist_ok=True)
+    research_json_folder = project_folder.joinpath('json_data')
+    research_json_folder.mkdir(parents=True, exist_ok=True)
+    database_location = project_folder.joinpath('research.sqlite')
+
+    conn = sqlite3.connect(database_location)
+    cursor = conn.cursor()
+    index = lancedb.connect('../../wonky_data/indexes/')
+    table = index.open_table('sections_hybrid')
+    # encoder = SentenceTransformer('nomic-ai/nomic-embed-text-v1.5', device='mps', trust_remote_code=True)
+
+    temperature = 0.2
+    crs_num_results = 3
+    wikipedia_num_results = 2
+
+    extraction_app = structured_csr_report_build()
+    extraction_action, extraction_result, extraction_state = extraction_app.run(
+        halt_after=["save_research_to_json"],
+        inputs={
+            "subject_matter": subject_matter,
+            "focus": focus,
+            "analysis_type": analysis_type,
+            "analysis_prompts": analysis_prompts,
+            "table": table,
+            "temperature": temperature,
+            "run_id": run_id,
+            "project_id": project_id,
+            "run_timestamp": run_timestamp,
+            "conn": conn,
+            "cursor": cursor,
+            "research_json_folder": research_json_folder,
+            "num_results": crs_num_results,
+            "source_dataset": crs_source_dataset,
+            "encoder":encoder
+        }
+    )
+
+    ui_conn = sqlite3.connect(DB_FILE)
+    ui_cursor = ui_conn.cursor()
+    extraction_data = extraction_state.get_all()
+    for _document_id, _extractions in extraction_data['extractions'].items():
+        title = 'EXT_' + _extractions['title']
+        content = _extractions['overview']
+        added_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        insert_new_research_paper(_document_id, title, content, 'extraction', project_id, stream_id, ui_cursor, ui_conn)
+    ui_conn.close()
+
+
+def generate_wikipedia_report(subject_matter: str, focus: str, project_id: str, stream_id: str):
+    run_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    run_id = str(uuid4())
+    # project_id = str(uuid4())
+    # project_id = 'proj_alpha_01'
+    # stream_id = 'general'
+    crs_source_dataset = 'CRSReports'
+    wikipedia_source_dataset = 'Wikipedia'
+    # subject_matter = "Rural Broadband in America."
+    # focus = "Historical, current, and future challenges for rural broadband and connectivity in America."
+
+    analysis_type = 'domestic_policy'
+    analysis_prompts = WIKIPEDIA_analysis_types[analysis_type]
+
+    project_folder = Path('project_research')
+    project_folder.mkdir(parents=True, exist_ok=True)
+    research_json_folder = project_folder.joinpath('json_data')
+    research_json_folder.mkdir(parents=True, exist_ok=True)
+    database_location = project_folder.joinpath('research.sqlite')
+
+    conn = sqlite3.connect(database_location)
+    cursor = conn.cursor()
+    index = lancedb.connect('../../wonky_data/indexes/')
+    table = index.open_table('sections_hybrid')
+    # encoder = SentenceTransformer('nomic-ai/nomic-embed-text-v1.5', device='mps', trust_remote_code=True)
+
+    temperature = 0.2
+    crs_num_results = 3
+    wikipedia_num_results = 2
+
+    extraction_app = structured_wikipedia_report_build()
+    extraction_action, extraction_result, extraction_state = extraction_app.run(
+        halt_after=["save_research_to_json"],
+        inputs={
+            "subject_matter": subject_matter,
+            "focus": focus,
+            "analysis_type": analysis_type,
+            "analysis_prompts": analysis_prompts,
+            "table": table,
+            "temperature": temperature,
+            "run_id": run_id,
+            "project_id": project_id,
+            "run_timestamp": run_timestamp,
+            "conn": conn,
+            "cursor": cursor,
+            "research_json_folder": research_json_folder,
+            "num_results": wikipedia_num_results,
+            "source_dataset": wikipedia_source_dataset,
+        }
+    )
+
+    ui_conn = sqlite3.connect(DB_FILE)
+    ui_cursor = ui_conn.cursor()
+    extraction_data = extraction_state.get_all()
+    for _document_id, _extractions in extraction_data['extractions'].items():
+        title = 'EXT_' + _extractions['title']
+        content = _extractions['overview']
+        added_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        insert_new_research_paper(_document_id, title, content, 'extraction', project_id, stream_id, ui_cursor, ui_conn)
+    ui_conn.close()
+
+
+@app.post("/generation/crs_report", response_model=None, status_code=200)
+async def generate_crs_report_extraction(subject_matter: str, focus: str, project_id: str, stream_id: str, background_tasks: BackgroundTasks):
+    print('project id')
+    print(project_id)
+    print(stream_id)
+    background_tasks.add_task(generate_crs_report, subject_matter=subject_matter, focus=focus,
+                              project_id=project_id, stream_id=stream_id)
+
+@app.post("/generation/wikipedia_report", response_model=None, status_code=200)
+async def generate_wikipedia_report_extraction(subject_matter: str, focus: str, project_id: str, background_tasks: BackgroundTasks):
+    background_tasks.add_task(generate_wikipedia_report, subject_matter=subject_matter, focus=focus,
+                              project_id=project_id, stream_id=stream_id)
+
+@app.post("/generation/crs_wiki_reports", response_model=None, status_code=200)
+async def generate_crs_wikipedia_report_extraction(subject_matter: str, focus: str, project_id: str, background_tasks: BackgroundTasks):
+    background_tasks.add_task(generate_crs_report, subject_matter=subject_matter, focus=focus,
+                              project_id=project_id, stream_id=stream_id)
+    background_tasks.add_task(generate_wikipedia_report, subject_matter=subject_matter, focus=focus,
+                              project_id=project_id, stream_id=stream_id)
+
 
 # --- API Endpoints (Existing and New) ---
 

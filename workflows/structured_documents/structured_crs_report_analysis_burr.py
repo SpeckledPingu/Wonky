@@ -1,4 +1,4 @@
-#%%
+
 from sentence_transformers import SentenceTransformer
 import torch
 import lancedb
@@ -15,7 +15,7 @@ from dotenv import load_dotenv
 from tqdm.notebook import tqdm
 import os
 load_dotenv('env_var')
-#%%
+
 from pathlib import Path
 import sqlite3
 from datetime import datetime
@@ -30,13 +30,13 @@ database_location = project_folder.joinpath('research.sqlite')
 
 conn = sqlite3.connect(database_location)
 cursor = conn.cursor()
-#%%
-index = lancedb.connect('../wonky_data/indexes/')
+
+index = lancedb.connect('../../wonky_data/indexes/')
 table = index.open_table('sections_hybrid')
-encoder = SentenceTransformer('nomic-ai/nomic-embed-text-v1.5', device='mps',trust_remote_code=True)
-#%%
+# encoder = SentenceTransformer('nomic-ai/nomic-embed-text-v1.5', device='mps',trust_remote_code=True)
+
 # table.create_fts_index(['text','source_file','id'], replace=True)
-#%%
+
 def format_documents(documents):
     formatted_texts = []
     report_ids = list(set([record['id'] for record in documents]))
@@ -76,6 +76,7 @@ model = "gemini-2.0-flash"
 total_tokens = list()
 
 def call_llm_flash(query, temperature=0.1, seed=42, max_tokens=7500 ):
+    load_dotenv('env_var')
     client = genai.Client(api_key=os.environ['GEMINI_API_KEY'])
     retries = 3
     time_delay = 15
@@ -105,7 +106,7 @@ def call_llm_flash(query, temperature=0.1, seed=42, max_tokens=7500 ):
                          'timestamp':datetime.now().strftime("%Y_%m_%d_%H_%M_%S")})
 
     return response.text
-#%%
+
 # This Python string contains the structured template for Foreign Policy Overviews
 # from CRS reports. It is intended to be used as a detailed guide or prompt
 # for a language model to extract information from a given report text.
@@ -381,7 +382,7 @@ if __name__ == "__main__":
     #    # print(response_from_llm)
     pass
 
-#%%
+
 prompt_to_llm_foreign = """
 #    Carefully review the provided CRS Report Text below.
 #    Then, fill out the fields in the following Structured Document Template using information exclusively from the report.
@@ -403,7 +404,7 @@ prompt_to_llm_foreign = """
 #    Separate the sections by a markdown line break: '---'
 #    Begin your output with "## Foreign Policy Overview - Structured Document" and follow the template structure.
 #    """
-#%%
+
 # This Python string contains the structured template for Domestic Policy Overviews
 # from CRS reports (or similar analytical documents). It is intended to be used
 # as a detailed guide or prompt for a language model to extract information
@@ -688,7 +689,7 @@ if __name__ == "__main__":
     #    # print(response_from_llm)
     pass
 
-#%%
+
 prompt_to_llm_domestic = """
 #    Carefully review the provided CRS Report Text below.
 #    Then, fill out the fields in the following Structured Document Template using information exclusively from the report.
@@ -710,7 +711,7 @@ prompt_to_llm_domestic = """
 #    Separate the sections by a markdown line break: '---'
 #    Begin your output with "## Domestic Policy Overview - Structured Document" and follow the template structure.
 #    """
-#%%
+
 # This Python string contains the structured template for Policy Impact Overviews
 # from analytical reports. It is intended to be used as a detailed guide or prompt
 # for a language model to extract information from a given report text.
@@ -954,7 +955,7 @@ if __name__ == "__main__":
     #    # print(response_from_llm)
     pass
 
-#%%
+
 prompt_to_llm_policy = """
 #    You are an expert policy analyst tasked with extracting structured information from analytical reports on policy impacts.
 #    Carefully review the provided Report Text below.
@@ -983,7 +984,7 @@ prompt_to_llm_policy = """
 #    Begin your output with "## Policy Impact Overview - Structured Document" and follow the template structure.
 #    Ensure every field entry containing extracted information includes a `[id_ref__section_ref___subsection_ref]` citation.
 #    """
-#%%
+
 from collections import defaultdict
 
 def convert_report_to_json(report):
@@ -1038,7 +1039,7 @@ def convert_report_to_json(report):
                 current_fields['values'].append(line)
         page_data.append(current_subsection)
     return page_data
-#%%
+
 def convert_df_sections_to_list(sections):
     section_list = sections.explode().to_list()
     section_list = convert_all_sections(section_list)
@@ -1062,7 +1063,7 @@ def convert_all_sections(sections):
         section = convert_sections_to_dict(_section)
         extracted_sections.extend(section)
     return extracted_sections
-#%%
+
 def add_citations_to_sections(sections, document_id):
     section_text = list()
     for section in sections:
@@ -1073,7 +1074,7 @@ def add_citations_to_sections(sections, document_id):
         subsection_text = f"""{subsection_text.strip()} `\[{citation}\]`"""
         section_text.append({'citation': citation, 'text':subsection_text})
     return section_text
-#%%
+
 def retrieve_full_document(article_id):
     full_document = table.search().where(f"id = '{article_id}'").limit(300).to_pandas()
     if 'vector' in full_document.columns:
@@ -1081,13 +1082,13 @@ def retrieve_full_document(article_id):
     full_document = full_document.sort_values(by='section_start')
     return full_document
 
-#%%
+
 def format_full_document(document_sections):
     report_sections = convert_df_sections_to_list(document_sections['sections'])
     report_sections = add_citations_to_sections(report_sections, document_sections.iloc[0]['number'])
     full_report = '\n\n'.join([x['text'] for x in report_sections])
     return full_report, report_sections
-#%%
+
 def format_enriched_report(extracted_article, full_document_df, report_sections, overview_type):
     article_pages = extracted_article.split('---')
     article_metadata = full_document_df.iloc[0].to_dict()
@@ -1105,7 +1106,7 @@ def format_enriched_report(extracted_article, full_document_df, report_sections,
     article_metadata['overview_citations'] = sorted([x['citation'] for x in used_citations])
     article_metadata['overview_cite_sources'] = used_citations
     return article_metadata
-#%%
+
 def insert_research_metadata(research_data, run_id, project_id, run_timestamp, subject_matter, focus, analysis_type, source_document, source_dataset, columns):
     formatted_data = deepcopy(research_data)
     formatted_data['run_id'] = run_id
@@ -1160,9 +1161,9 @@ def insert_research_sources_metadata(research_data, run_id, project_id, run_time
     """
     values_tuple = tuple(formatted_data.get(col) for col in columns)
     return sql_insert_string, values_tuple
-#%%
+
 from burr.core import action, State, ApplicationBuilder, ApplicationContext, Action
-#%%
+
 analysis_types = {'foreign_policy':
                       {'heuristic':FOREIGN_POLICY_OVERVIEW_TEMPLATE_STRING,
                        'prompt':prompt_to_llm_foreign},
@@ -1173,11 +1174,11 @@ analysis_types = {'foreign_policy':
                       {'heuristic':POLICY_IMPACT_OVERVIEW_TEMPLATE_STRING,
                        'prompt':prompt_to_llm_policy}
                   }
-#%%
+
 inputs = ['analysis_type','subject_matter','focus', 'prompt_templates', 'table']
-#%%
+
 @action(reads=[], writes=["search_results", "article_ids","subject_matter","focus"])
-def vector_search_reports(state: State, focus: str, subject_matter: str, table, num_results: int) -> State:
+def vector_search_reports(state: State, focus: str, subject_matter: str, table, num_results: int, encoder) -> State:
     search_vector = encoder.encode(' '.join([subject_matter, focus]))
     search_results = table.search(search_vector).limit(num_results).to_pandas()
     search_results = search_results.drop('vector', axis=1)
@@ -1277,7 +1278,7 @@ def save_research_to_json(state: State, run_id: str, project_id: str, run_timest
         json.dump(extracted_overview, f)
 
     return state
-#%%
+
 
 def structured_csr_report_build():
     extraction_app = (
@@ -1314,9 +1315,9 @@ def structured_csr_report_build():
 # focus = "Historical, current, and future challenges for rural broadband and connectivity in America."
 # analysis_type = 'domestic_policy'
 # analysis_prompts = analysis_types[analysis_type]
-#%%
+
 # extraction_app.visualize("./graph", format="png")
-#%%
+
 
 
 # extraction_action, extraction_result, extraction_state = extraction_app.run(
@@ -1338,15 +1339,15 @@ def structured_csr_report_build():
 #         "source_dataset": source_dataset
 #     }
 # # )
-# #%%
+# 
 # run_id
-# #%%
+# 
 # research_json_folder
-# #%%
+# 
 #
-# #%%
+# 
 #
-# #%%
+# 
 # research_table = 'research_runs'
 # research_table_sql = """CREATE TABLE IF NOT EXISTS research_runs (
 #     run_id TEXT,
@@ -1417,11 +1418,11 @@ def structured_csr_report_build():
 # # conn.commit()
 #
 # # conn.close()
-# #%%
+# 
 
-#%%
 
-#%%
+
+
 def insert_extraction_data(extractions, cursor, conn, run_id, project_id, run_timestamp, subject_matter, focus, analysis_type, source_dataset):
     project_run_columns = [
         'run_id', 'run_timestamp', 'project_id', 'subject_matter', 'focus', 'analysis_type',
@@ -1447,6 +1448,6 @@ def insert_extraction_data(extractions, cursor, conn, run_id, project_id, run_ti
             cursor.execute(overview_sources_insert_sql[0], overview_sources_insert_sql[1])
 
     conn.commit()
-#%%
 
-#%%
+
+

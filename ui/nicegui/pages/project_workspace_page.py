@@ -491,7 +491,8 @@ async def create_project_workspace_content(project_id: str, stream_id: str) -> N
                                                 value=p_id in page_ui_state['selected_papers_for_chat_or_action'],
                                                 on_change=lambda e, paper_id=p_id, paper_title=p_title:
                                                 _handle_toggle_paper_for_context(paper_id, e.value, paper_title)) \
-                                                .tooltip(f'Add/Remove "{p_title}" for chat/actions')
+                                                .tooltip(f'Add/Remove "{p_title}" for chat/actions') \
+
 
                                             def show_paper_content_closure(p_content_for_closure, paper_id_for_closure):
                                                 async def actual_handler():
@@ -503,7 +504,7 @@ async def create_project_workspace_content(project_id: str, stream_id: str) -> N
 
                                             ui.button(p_title, on_click=show_paper_content_closure(p_content, p_id)) \
                                                 .props('flat dense no-caps padding="none"') \
-                                                .classes('text-primary hover:underline cursor-pointer flex-grow text-left ml-2 mr-1 truncate')
+                                                .classes('text-primary hover:underline cursor-pointer flex-grow text-left ml-2 mr-1 truncatel')
 
                                             async def request_paper_deletion(paper_id_to_delete, paper_title_to_delete):
                                                 with ui.dialog() as confirm_dialog, ui.card():

@@ -35,9 +35,9 @@ database_location = project_folder.joinpath('research.sqlite')
 conn = sqlite3.connect(database_location)
 cursor = conn.cursor()
 # #%%
-index = lancedb.connect('../wonky_data/indexes/')
+index = lancedb.connect('../../wonky_data/indexes/')
 table = index.open_table('sections_hybrid')
-encoder = SentenceTransformer('nomic-ai/nomic-embed-text-v1.5', device='mps',trust_remote_code=True)
+# encoder = SentenceTransformer('nomic-ai/nomic-embed-text-v1.5', device='mps',trust_remote_code=True)
 #%%
 # table.create_fts_index(['text','source_file','id'], replace=True)
 #%%

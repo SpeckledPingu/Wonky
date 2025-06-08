@@ -1,7 +1,8 @@
 # pages/research_stream_page.py
 
-from nicegui import ui, app
+from nicegui import ui, app, run
 import httpx  # Added for API calls
+import requests
 import asyncio  # For async operations
 
 # --- API Configuration ---
@@ -116,12 +117,21 @@ async def create_research_stream_page_content(project_identifier: str) -> None: 
                 research_streams_view.refresh()
             # else: ui.notify handled by api_delete_stream
 
-        def handle_run_research(p_id: str, stream_data: dict):  # This can remain sync
+        async def handle_run_research(p_id: str, stream_data: dict):  # This can remain sync
             stream_subject = stream_data.get("subject", "unknown_stream")
             stream_identifier = stream_data.get("id")
+            print(stream_data)
             if not stream_identifier:
                 ui.notify("Error: Stream ID is missing for navigation.", type='error')
                 return
+            # r = requests.post("http://127.0.0.1:8000/generation/crs_report",
+            #                   params={"subject_matter": stream_subject,
+            #                           "focus":stream_data.get("focus")})
+            r = await run.io_bound(requests.post,"http://127.0.0.1:8000/generation/crs_report",
+                              params={"subject_matter": stream_subject,
+                                      "focus": stream_data.get("focus"),
+                                      "project_id":p_id,
+                                      "stream_id":stream_identifier})
 
             ui.notify(f'Navigating to workspace for: "{stream_subject}"...', type='info')
             ui.navigate.to(f'/project-workspace/{p_id}/{stream_identifier}')
