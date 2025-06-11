@@ -12,6 +12,8 @@ from sentence_transformers import SentenceTransformer
 from pathlib import Path
 from dotenv import load_dotenv
 
+from workflows.structured_documents.structured_talking_points_burr import structured_talking_points_build
+
 load_dotenv('env_var')
 
 import os
@@ -21,6 +23,12 @@ from workflows.structured_documents.structured_crs_report_analysis_burr import s
 from workflows.structured_documents.structured_crs_report_analysis_burr import analysis_types as CRS_analysis_types
 from workflows.structured_documents.structured_wikipedia_report_analysis_wikipedia_burr import structured_wikipedia_report_build
 from workflows.structured_documents.structured_wikipedia_report_analysis_wikipedia_burr import analysis_types as WIKIPEDIA_analysis_types
+from workflows.structured_documents.structured_compare_actor_positions_burr import structured_compare_actor_positions_build, actor_comparison_prompt
+from workflows.structured_documents.structured_executive_summary_report_burr import structured_executive_summary_report_build, two_part_summary_prompt
+from workflows.structured_documents.structured_extract_policy_recs_burr import structured_extract_policy_recommendations_report_build, policy_recommendations_prompt
+from workflows.structured_documents.structured_find_funding_burr import structured_compare_actor_positions_build, funding_opportunities_prompt
+from workflows.structured_documents.structured_talking_points_burr import structured_talking_points_build, talking_points_prompt
+from workflows.structured_documents.structured_stakeholder_report_burr import structured_stakeholder_report_build, stakeholder_analysis_prompt
 
 # --- Database Configuration ---
 DB_FILE = 'ui/ui_data.sqlite'
@@ -181,7 +189,262 @@ def insert_into_research_stream(id, project_id, subject, focus, project_created_
     return row
 
 
+
+
+
 # --- Generation Endpoints ---
+def generate_stakeholder_analysis_report(subject_matter: str, focus: str, project_id: str, stream_id: str, document_ids: list):
+    run_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    run_id = str(uuid4())
+
+    project_folder = Path('project_research')
+    project_folder.mkdir(parents=True, exist_ok=True)
+    research_json_folder = project_folder.joinpath('json_data')
+    research_json_folder.mkdir(parents=True, exist_ok=True)
+    database_location = project_folder.joinpath('research.sqlite')
+
+    conn = sqlite3.connect(database_location)
+    cursor = conn.cursor()
+    temperature = 0.2
+    fields = ['overview', 'run_id', 'run_timestamp', 'project_id', 'subject_matter', 'focus', 'source_document']
+
+    summary_app = structured_stakeholder_report_build()
+    summary_action, summary_result, summary_state = summary_app.run(
+        halt_after=["generate_stakeholder_summary"],
+        inputs={
+            "subject_matter": subject_matter,
+            "focus": focus,
+            "fields": fields,
+            "document_ids": document_ids,
+            "summary_prompt_template": stakeholder_analysis_prompt,
+            "temperature": 0.2,
+            "conn": conn,
+            "cursor": cursor,
+        }
+    )
+
+    ui_conn = sqlite3.connect(DB_FILE)
+    ui_cursor = ui_conn.cursor()
+    extraction_data = summary_state.get_all()
+    for _document_id, _extractions in extraction_data['extractions'].items():
+        title = 'Stake_' + _extractions['title']
+        content = _extractions['overview']
+        added_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        insert_new_research_paper(_document_id, title, content, 'stakeholder_report', project_id, stream_id, ui_cursor, ui_conn)
+    ui_conn.close()
+
+
+def generate_talking_points_report(subject_matter: str, focus: str, project_id: str, stream_id: str, document_ids: list,
+                                   audience: str, viewpoint: str):
+    run_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    run_id = str(uuid4())
+
+    project_folder = Path('project_research')
+    project_folder.mkdir(parents=True, exist_ok=True)
+    research_json_folder = project_folder.joinpath('json_data')
+    research_json_folder.mkdir(parents=True, exist_ok=True)
+    database_location = project_folder.joinpath('research.sqlite')
+
+    conn = sqlite3.connect(database_location)
+    cursor = conn.cursor()
+    temperature = 0.2
+    fields = ['overview', 'run_id', 'run_timestamp', 'project_id', 'subject_matter', 'focus', 'source_document']
+
+    summary_app = structured_talking_points_build()
+    summary_action, summary_result, summary_state = summary_app.run(
+        halt_after=["generate_talking_points_summary"],
+        inputs={
+            "subject_matter": subject_matter,
+            "focus": focus,
+            "fields":fields,
+            "audience": audience,
+            "viewpoint": viewpoint,
+            "document_ids": document_ids,
+            "talkingpoints_prompt":talking_points_prompt,
+            "temperature":temperature,
+            "conn": conn,
+            "cursor": cursor,
+        }
+    )
+
+    ui_conn = sqlite3.connect(DB_FILE)
+    ui_cursor = ui_conn.cursor()
+    extraction_data = summary_state.get_all()
+    for _document_id, _extractions in extraction_data['extractions'].items():
+        title = 'TPoints_' + _extractions['title']
+        content = _extractions['overview']
+        added_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        insert_new_research_paper(_document_id, title, content, 'talking_points', project_id, stream_id, ui_cursor, ui_conn)
+    ui_conn.close()
+
+
+def generate_find_funding_report(subject_matter: str, focus: str, project_id: str, stream_id: str, document_ids: list):
+    run_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    run_id = str(uuid4())
+
+    project_folder = Path('project_research')
+    project_folder.mkdir(parents=True, exist_ok=True)
+    research_json_folder = project_folder.joinpath('json_data')
+    research_json_folder.mkdir(parents=True, exist_ok=True)
+    database_location = project_folder.joinpath('research.sqlite')
+
+    conn = sqlite3.connect(database_location)
+    cursor = conn.cursor()
+    temperature = 0.2
+    fields = ['overview', 'run_id', 'run_timestamp', 'project_id', 'subject_matter', 'focus', 'source_document']
+
+    summary_app = structured_compare_actor_positions_build()
+    summary_action, summary_result, summary_state = summary_app.run(
+        halt_after=["generate_funding_opportunities_summary"],
+        inputs={
+            "subject_matter": subject_matter,
+            "focus": focus,
+            "fields": fields,
+            "document_ids": document_ids,
+            "funding_opportunities_prompt": funding_opportunities_prompt,
+            "temperature": temperature,
+            "conn": conn,
+            "cursor": cursor,
+        }
+    )
+
+    ui_conn = sqlite3.connect(DB_FILE)
+    ui_cursor = ui_conn.cursor()
+    extraction_data = summary_state.get_all()
+    for _document_id, _extractions in extraction_data['extractions'].items():
+        title = 'Funding_' + _extractions['title']
+        content = _extractions['overview']
+        added_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        insert_new_research_paper(_document_id, title, content, 'funding_opportunities', project_id, stream_id, ui_cursor, ui_conn)
+    ui_conn.close()
+
+
+def generate_policy_recommendation_report(subject_matter: str, focus: str, project_id: str, stream_id: str, document_ids: list):
+    run_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    run_id = str(uuid4())
+
+    project_folder = Path('project_research')
+    project_folder.mkdir(parents=True, exist_ok=True)
+    research_json_folder = project_folder.joinpath('json_data')
+    research_json_folder.mkdir(parents=True, exist_ok=True)
+    database_location = project_folder.joinpath('research.sqlite')
+
+    conn = sqlite3.connect(database_location)
+    cursor = conn.cursor()
+    temperature = 0.2
+    fields = ['overview', 'run_id', 'run_timestamp', 'project_id', 'subject_matter', 'focus', 'source_document']
+
+    summary_app = structured_compare_actor_positions_build()
+    summary_action, summary_result, summary_state = summary_app.run(
+        halt_after=["generate_policy_recommendations_summary"],
+        inputs={
+            "subject_matter": subject_matter,
+            "focus": focus,
+            "fields": fields,
+            "document_ids": document_ids,
+            "policy_recommendations_prompt": policy_recommendations_prompt,
+            "temperature": temperature,
+            "conn": conn,
+            "cursor": cursor,
+        }
+    )
+    ui_conn = sqlite3.connect(DB_FILE)
+    ui_cursor = ui_conn.cursor()
+    extraction_data = summary_state.get_all()
+    for _document_id, _extractions in extraction_data['extractions'].items():
+        title = 'PolicyR_' + _extractions['title']
+        content = _extractions['overview']
+        added_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        insert_new_research_paper(_document_id, title, content, 'policy_recommendations', project_id, stream_id, ui_cursor, ui_conn)
+    ui_conn.close()
+
+
+def generate_executive_summary_report(subject_matter: str, focus: str, project_id: str, stream_id: str, document_ids: list):
+    run_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    run_id = str(uuid4())
+
+    project_folder = Path('project_research')
+    project_folder.mkdir(parents=True, exist_ok=True)
+    research_json_folder = project_folder.joinpath('json_data')
+    research_json_folder.mkdir(parents=True, exist_ok=True)
+    database_location = project_folder.joinpath('research.sqlite')
+
+    conn = sqlite3.connect(database_location)
+    cursor = conn.cursor()
+    temperature = 0.2
+    fields = ['overview', 'run_id', 'run_timestamp', 'project_id', 'subject_matter', 'focus', 'source_document']
+
+    summary_app = structured_executive_summary_report_build()
+    summary_action, summary_result, summary_state = summary_app.run(
+    halt_after=["generate_executive_summary"],
+    inputs={
+        "subject_matter": subject_matter,
+        "focus": focus,
+        "fields":fields,
+        "document_ids": document_ids,
+        "summary_prompt_template":two_part_summary_prompt,
+        "temperature":temperature,
+        "conn": conn,
+        "cursor": cursor,
+    }
+)
+
+    ui_conn = sqlite3.connect(DB_FILE)
+    ui_cursor = ui_conn.cursor()
+    extraction_data = summary_state.get_all()
+    print(extraction_data['summary'])
+    # for _document_id, _extractions in extraction_data['summary'].items():
+    title = 'Exec_' + ' '.join(document_ids) #_extractions['title']
+    content = extraction_data['summary']
+    added_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+    insert_new_research_paper(title, title, content, 'executive_summary', project_id, stream_id, ui_cursor, ui_conn)
+    ui_conn.close()
+
+
+def generate_compare_actor_positions_report(subject_matter: str, focus: str, project_id: str, stream_id: str, document_ids: list,
+                                            actors_to_compare: list):
+    run_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
+    run_id = str(uuid4())
+
+    project_folder = Path('project_research')
+    project_folder.mkdir(parents=True, exist_ok=True)
+    research_json_folder = project_folder.joinpath('json_data')
+    research_json_folder.mkdir(parents=True, exist_ok=True)
+    database_location = project_folder.joinpath('research.sqlite')
+
+    conn = sqlite3.connect(database_location)
+    cursor = conn.cursor()
+    temperature = 0.2
+    fields = ['overview', 'run_id', 'run_timestamp', 'project_id', 'subject_matter', 'focus', 'source_document']
+    actors_to_compare = ', '.join(actors_to_compare)
+
+    summary_app = structured_compare_actor_positions_build()
+    summary_action, summary_result, summary_state = summary_app.run(
+        halt_after=["generate_actor_comparison_summary"],
+        inputs={
+            "subject_matter": subject_matter,
+            "focus": focus,
+            "fields":fields,
+            "document_ids": document_ids,
+            "actor_comparison_prompt":actor_comparison_prompt,
+            "actors_to_compare": actors_to_compare,
+            "temperature":temperature,
+            "conn": conn,
+            "cursor": cursor,
+        }
+    )
+
+    ui_conn = sqlite3.connect(DB_FILE)
+    ui_cursor = ui_conn.cursor()
+    extraction_data = summary_state.get_all()
+    for _document_id, _extractions in extraction_data['extractions'].items():
+        title = 'Compare_' + _extractions['title']
+        content = _extractions['overview']
+        added_at = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+        insert_new_research_paper(_document_id, title, content, 'compare_actors', project_id, stream_id, ui_cursor, ui_conn)
+    ui_conn.close()
+
+
 def generate_crs_report(subject_matter: str, focus: str, project_id: str, stream_id: str):
     run_timestamp = datetime.now().strftime('%Y-%m-%d_%H-%M-%S')
     run_id = str(uuid4())
@@ -306,6 +569,156 @@ def generate_wikipedia_report(subject_matter: str, focus: str, project_id: str, 
         insert_new_research_paper(_document_id, title, content, 'extraction', project_id, stream_id, ui_cursor, ui_conn)
     ui_conn.close()
 
+class SelectedDocumentsAction(BaseModel):
+    subject_matter: str
+    focus: str
+    project_id: str
+    stream_id: str
+    selected_documents: List[str]
+
+
+# api.py
+
+# ... (existing imports like FastAPI, HTTPException, Depends, BackgroundTasks, BaseModel, Field, List, Optional, etc.)
+# ... (ensure your generation functions like generate_executive_summary_report, etc., are imported or defined)
+
+# --- Pydantic Model for the new endpoint's payload ---
+class ExecuteActionPayload(BaseModel):
+    project_id: str
+    stream_id: str
+    selected_documents: List[str] = Field(default_factory=list)
+    action_id: str
+
+    # Optional fields based on what 'required_inputs' might define for various actions
+    # These should correspond to the 'name' attributes in your required_inputs JSON
+    subject_matter: Optional[str] = None
+    focus: Optional[str] = None
+    max_length: Optional[int] = None # Example, if used by a workflow
+    audience: Optional[str] = None   # For actions like 'generate_talking_points'
+    viewpoint: Optional[str] = None  # For actions like 'generate_talking_points'
+    actors_to_compare: Optional[List[str]] = None # For 'compare_actor_positions'
+    # Add any other dynamic input fields that your actions might require
+
+
+# --- Mapping Action IDs to Backend Functions ---
+# Keys: 'id' from the dynamic_actions table
+# Values: The corresponding Python function in api.py that runs the Burr workflow
+ACTION_TO_FUNCTION_MAP = {
+    # Example mapping - replace with your actual action IDs and functions
+    "generate_custom_summary": generate_executive_summary_report,
+    # Add mappings for other actions defined in your dynamic_actions table, e.g.:
+    # "generate_policy_recs_v1": generate_policy_recommendation_report,
+    # "find_funding_v1": generate_find_funding_report,
+    # "generate_talking_points_v1": generate_talking_points_report,
+    # "analyze_stakeholders_v1": generate_stakeholder_analysis_report,
+    # "compare_actors_v1": generate_compare_actor_positions_report,
+}
+
+# --- New API Endpoint ---
+
+@app.post("/actions/execute_dynamic_action", status_code=202) # 202 Accepted for background tasks
+async def execute_dynamic_action_endpoint(
+    payload: ExecuteActionPayload,
+    background_tasks: BackgroundTasks,
+    conn: sqlite3.Connection = Depends(get_db_connection) # To fetch action details if needed
+):
+    """
+    Generic endpoint to execute a dynamic action based on its ID and provided inputs.
+    """
+    action_function = ACTION_TO_FUNCTION_MAP.get(payload.action_id)
+
+    if not action_function:
+        conn.close()
+        raise HTTPException(
+            status_code=404,
+            detail=f"Action ID '{payload.action_id}' is not mapped to a backend function. Please check ACTION_TO_FUNCTION_MAP."
+        )
+
+    # Fetch action details from DB to get the prompt_template if needed by the workflow
+    # This assumes your Burr workflow functions are designed to accept a custom prompt.
+    cursor = conn.cursor()
+    cursor.execute("SELECT prompt_template FROM dynamic_actions WHERE id = ?", (payload.action_id,))
+    action_db_row = cursor.fetchone()
+    conn.close()
+
+    if not action_db_row:
+        # This should ideally not happen if the frontend got the action_id from the same DB
+        raise HTTPException(status_code=404, detail=f"Configuration for action ID '{payload.action_id}' not found in database.")
+
+    db_prompt_template = _dict_from_row(action_db_row).get("prompt_template")
+
+    # Prepare arguments for the target action_function
+    common_args = {
+        "project_id": payload.project_id,
+        "stream_id": payload.stream_id,
+        "document_ids": payload.selected_documents,
+    }
+
+    # Add action-specific arguments from the payload
+    # This section needs to align with the signatures of your mapped functions
+    specific_args = {}
+    if payload.subject_matter is not None:
+        specific_args["subject_matter"] = payload.subject_matter
+    if payload.focus is not None:
+        specific_args["focus"] = payload.focus
+
+    # For functions requiring more specific inputs like audience, viewpoint, actors_to_compare
+    if action_function == generate_talking_points_report:
+        if payload.audience is None or payload.viewpoint is None:
+            raise HTTPException(status_code=400, detail="Audience and viewpoint are required for generating talking points.")
+        specific_args["audience"] = payload.audience
+        specific_args["viewpoint"] = payload.viewpoint
+    elif action_function == generate_compare_actor_positions_report:
+        if payload.actors_to_compare is None:
+            raise HTTPException(status_code=400, detail="Actors to compare are required for this action.")
+        specific_args["actors_to_compare"] = payload.actors_to_compare
+    # Add other elif blocks for functions with unique required dynamic inputs
+
+    # IMPORTANT: Adapt your generation functions (e.g., generate_executive_summary_report)
+    # to accept a parameter for the prompt template (e.g., `prompt_override: Optional[str] = None`)
+    # and use it in the Burr app's inputs if provided.
+    # Example modification in generate_executive_summary_report:
+    #   def generate_executive_summary_report(..., prompt_override: Optional[str] = None):
+    #       ...
+    #       current_prompt = prompt_override if prompt_override else two_part_summary_prompt # (default prompt)
+    #       burr_inputs = {..., "summary_prompt_template": current_prompt, ...}
+    #       summary_app.run(..., inputs=burr_inputs)
+    #
+    # If your generation functions are adapted, you can pass the db_prompt_template:
+    if db_prompt_template:
+        # The key here ('prompt_override', 'custom_prompt', etc.) must match
+        # the parameter name in your adapted generation functions.
+        specific_args["prompt_override"] = db_prompt_template # Example key
+
+    final_args = {**common_args, **specific_args}
+
+    # Validate that all required args for the specific function are present
+    # (Python will raise TypeError if arguments are missing when calling the function)
+    # You can add more specific checks here based on function signatures if desired.
+
+    background_tasks.add_task(action_function, **final_args)
+
+    return {
+        "message": f"Action '{payload.action_id}' (mapped to: {action_function.__name__}) initiated successfully.",
+        "details": f"Processing with arguments: { {k:v for k,v in final_args.items() if k not in ['document_ids']} } and {len(final_args.get('document_ids',[]))} documents."
+    }
+
+# Make sure this new endpoint is below your app = FastAPI() line and
+# other necessary imports and definitions.
+
+
+@app.post("/generation/executive_summary", response_model=None, status_code=200)
+async def generate_executive_summary_report_endpoint(selected_documents: SelectedDocumentsAction, background_tasks: BackgroundTasks):
+    print('project id')
+    print(selected_documents.project_id)
+    print(selected_documents.stream_id)
+    print(selected_documents)
+    background_tasks.add_task(generate_executive_summary_report,
+                              subject_matter=selected_documents.subject_matter,
+                              focus=selected_documents.focus,
+                              project_id=selected_documents.project_id,
+                              stream_id=selected_documents.stream_id,
+                              document_ids=selected_documents.selected_documents)
 
 @app.post("/generation/crs_report", response_model=None, status_code=200)
 async def generate_crs_report_extraction(subject_matter: str, focus: str, project_id: str, stream_id: str, background_tasks: BackgroundTasks):
@@ -316,12 +729,12 @@ async def generate_crs_report_extraction(subject_matter: str, focus: str, projec
                               project_id=project_id, stream_id=stream_id)
 
 @app.post("/generation/wikipedia_report", response_model=None, status_code=200)
-async def generate_wikipedia_report_extraction(subject_matter: str, focus: str, project_id: str, background_tasks: BackgroundTasks):
+async def generate_wikipedia_report_extraction(subject_matter: str, focus: str, project_id: str, stream_id:str, background_tasks: BackgroundTasks):
     background_tasks.add_task(generate_wikipedia_report, subject_matter=subject_matter, focus=focus,
                               project_id=project_id, stream_id=stream_id)
 
 @app.post("/generation/crs_wiki_reports", response_model=None, status_code=200)
-async def generate_crs_wikipedia_report_extraction(subject_matter: str, focus: str, project_id: str, background_tasks: BackgroundTasks):
+async def generate_crs_wikipedia_report_extraction(subject_matter: str, focus: str, project_id: str, stream_id:str, background_tasks: BackgroundTasks):
     background_tasks.add_task(generate_crs_report, subject_matter=subject_matter, focus=focus,
                               project_id=project_id, stream_id=stream_id)
     background_tasks.add_task(generate_wikipedia_report, subject_matter=subject_matter, focus=focus,

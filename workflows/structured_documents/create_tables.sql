@@ -62,3 +62,24 @@ CREATE TABLE IF NOT EXISTS projects (
     project_description TEXT
 
 );
+
+CREATE TABLE IF NOT EXISTS dynamic_actions (
+    id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    description TEXT,
+    action_type TEXT,
+    output_destination TEXT,
+    prompt_template TEXT,
+    ui_group TEXT,
+    required_inputs TEXT, -- JSON string, e.g., '[{"name": "subject", "label": "Subject Matter", "type": "text", "required": true}]'
+    is_user_defined INTEGER
+);
+
+INSERT INTO dynamic_actions (id, name, description, action_type, output_destination, prompt_template, ui_group, required_inputs, is_user_defined)
+VALUES
+('generate_custom_summary', 'Generate Custom Summary', 'Generates a summary based on user-provided subject and focus.', 'process_documents', 'new_document', 'Summarize the selected documents focusing on {subject_matter} regarding {focus}. Selected documents:\n{selected_doc_titles_list}', 'document_actions',
+'[
+    {"name": "subject_matter", "label": "Subject Matter", "type": "text", "required": true, "default": "General Overview"},
+    {"name": "focus", "label": "Specific Focus", "type": "textarea", "required": true, "default": "Key challenges and opportunities"},
+    {"name": "max_length", "label": "Max Summary Length (words)", "type": "number", "required": false, "default": 250}
+]', 1);

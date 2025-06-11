@@ -5,6 +5,7 @@ import uuid
 import asyncio
 # import sqlite3 # No longer needed for direct DB access
 from datetime import datetime
+import requests
 import httpx  # Added for API calls
 
 # --- API Configuration ---
@@ -212,25 +213,149 @@ async def scroll_chat_to_bottom(container_id: str):
         f"setTimeout(() => {{ const el = document.getElementById('{container_id}'); if(el) el.scrollTop = el.scrollHeight; }}, 0);"
     )
 
+
+# (Ensure imports like ui, asyncio, datetime, uuid are present at the top of your file)
+import json  # For parsing required_inputs if it's a string from API
+
+
+async def prompt_for_action_inputs(inputs_config_str_or_list: str | list, action_name: str,
+                                   dialog_context) -> dict | None:
+    """
+    Displays a dialog to collect user inputs based on the action's configuration.
+    Returns a dictionary of inputs if submitted, or None if cancelled.
+    """
+    collected_inputs_val = {}
+    input_elements = {}
+
+    inputs_config = []
+    if isinstance(inputs_config_str_or_list, str):
+        try:
+            inputs_config = json.loads(inputs_config_str_or_list)
+        except json.JSONDecodeError:
+            print(f"Error: Could not parse required_inputs JSON for action '{action_name}'")
+            ui.notify(f"Configuration error for '{action_name}': Invalid input definitions.", type='negative')
+            return None  # Indicates an error or cancellation
+    elif isinstance(inputs_config_str_or_list, list):
+        inputs_config = inputs_config_str_or_list
+    else:
+        print(f"Warning: No valid input configuration for action '{action_name}'")
+        return {}  # No inputs defined, proceed as if none were required and successfully "collected" (empty dict)
+
+    if not inputs_config:  # No inputs are actually required
+        return {}
+
+    with dialog_context:  # Ensures dialog is created in the correct UI update context
+        with ui.dialog() as dialog, ui.card().tight():
+            with ui.card_section():
+                ui.label(f"Configure inputs for: {action_name}").classes('text-lg font-medium')
+
+            with ui.card_section().classes('w-96 max-w-full'):  # Adjust width as needed
+                for config in inputs_config:
+                    field_name = config.get("name")
+                    label = config.get("label", field_name.replace("_", " ").title() if field_name else "Input")
+                    input_type = config.get("type", "text")
+                    required = config.get("required", False)
+                    default_value = config.get("default")
+
+                    if not field_name:
+                        continue
+
+                    element = None
+                    if input_type == "textarea":
+                        element = ui.textarea(label=label,
+                                              value=str(default_value) if default_value is not None else "") \
+                            .props('filled autogrow clearable')
+                    elif input_type == "number":
+                        element = ui.number(label=label,
+                                            value=float(default_value) if default_value is not None else 0.0,
+                                            format='%.2f' if isinstance(default_value, float) else None) \
+                            .props('filled clearable')
+                    else:  # Default to text input
+                        element = ui.input(label=label, value=str(default_value) if default_value is not None else "") \
+                            .props('filled clearable')
+
+                    if required:
+                        element.props(f'hint="Required"')  # Visual hint
+                    input_elements[field_name] = element
+
+            with ui.card_actions().props('align=right'):
+                ui.button('Cancel', on_click=dialog.close, color='grey').props('flat')
+
+                async def handle_submit():
+                    is_valid = True
+                    for config_item in inputs_config:
+                        field_name = config_item.get("name")
+                        is_required = config_item.get("required", False)
+                        if field_name in input_elements and is_required:
+                            value = input_elements[field_name].value
+                            current_label = config_item.get("label", field_name)
+                            if isinstance(value, str) and not value.strip():
+                                ui.notify(f"'{current_label}' is required.", type='negative')
+                                is_valid = False
+                            elif value is None and config_item.get("type") != "number":  # Number can be 0
+                                ui.notify(f"'{current_label}' is required.", type='negative')
+                                is_valid = False
+
+                    if not is_valid:
+                        return
+
+                    for name, el in input_elements.items():
+                        collected_inputs_val[name] = el.value
+                    dialog.submit(collected_inputs_val)
+
+                ui.button('Submit', on_click=handle_submit, color='primary')
+
+        result = await dialog
+        return result  # This will be the `collected_inputs_val` dict or None if closed/cancelled
+
+
 # --- Action Processing Function (Simulates Backend Interaction) ---
+# ... (other imports)
+# from datetime import datetime # Ensure datetime is imported
+
 async def process_dynamic_action(
         project_id: str,
         stream_id: str,
         action_id: str,
         selected_paper_ids: list[str],
         page_ui_state: dict,
-        _context
+        _context  # This is the UI context (e.g., a splitter panel or tab container)
 ):
     action_details = await api_get_dynamic_action_by_id(action_id)
     if not action_details:
-        print('no action details')
+        print(f'No action details found for action_id: {action_id}')
+        ui.notify(f"Action '{action_id}' configuration not found.", type='error')
         return
 
     action_name = action_details.get('name', 'Unknown Action')
     action_type = action_details.get('action_type')
     output_destination = action_details.get('output_destination')
     prompt_template = action_details.get('prompt_template', "")
+    required_inputs_config = action_details.get('required_inputs')  # Expecting list of dicts or JSON string
+    required_inputs_config = """[
+        {"name": "subject_matter", "label": "Subject Matter", "type": "text", "required": true, "default": "General Overview"},
+        {"name": "focus", "label": "Specific Focus", "type": "textarea", "required": true, "default": "Key challenges and opportunities"},
+        {"name": "max_length", "label": "Max Summary Length (words)", "type": "number", "required": false, "default": 250}
+    ]"""
+    user_provided_inputs = {}
+    if required_inputs_config:
+        # Pass the _context for the dialog to be rendered within the correct UI scope
+        user_provided_inputs = await prompt_for_action_inputs(
+            required_inputs_config,
+            action_name,
+            _context
+        )
+        if user_provided_inputs is None:  # User cancelled the dialog
+            with _context:
+                ui.notify(f"Action '{action_name}' cancelled by user.", type='info')
+            page_ui_state['last_action_completed_details'] = {
+                'action_name': action_name, 'status': 'cancelled',
+                'message': f"Action '{action_name}' was cancelled.",
+                'timestamp': datetime.now().isoformat()
+            }
+            return
 
+    # Proceed with action processing using user_provided_inputs
     with _context:
         ui.notify(f"Initiating '{action_name}'...", type='info')
 
@@ -254,7 +379,49 @@ async def process_dynamic_action(
         if not selected_titles or all(title == "Unknown Paper" for title in selected_titles):
             ui.notify(f"Could not find titles for selected papers for '{action_name}'.", type='warning')
 
+        # --- MODIFIED/EXAMPLE BACKEND CALL ---
+        # This section demonstrates using the collected inputs.
+        # The original requests.post was synchronous and hardcoded.
+        # Replace with an async call to your API, using user_provided_inputs.
+        backend_payload = {
+            'project_id': project_id,
+            'stream_id': stream_id,
+            'selected_documents': selected_paper_ids,
+            'action_id': action_id,  # Good to pass the action_id
+            # Add any other fixed parameters the backend expects for this action_type
+        }
+        # Merge user-provided inputs into the payload
+        # These keys (e.g., 'subject_matter', 'focus') must match what your backend expects
+        # and what you defined in `required_inputs` for this action.
+        backend_payload.update(user_provided_inputs)
+
+        # Example: If your action 'generate_custom_summary' calls a specific endpoint
+        # You might need to make this endpoint configurable in action_details too.
+        # For now, let's assume a generic endpoint or that the backend routes based on action_id.
+        # This is a MOCK call. Replace with your actual API endpoint.
+        print(f"Mock backend call for '{action_name}' with payload: {backend_payload}")
+        # try:
+        #     # Example: response = await api_client.post(f"/actions/process_documents", json=backend_payload)
+        #     # response.raise_for_status()
+        #     # ui.notify(f"'{action_name}' submitted to backend.", type='info')
+        #     await asyncio.sleep(1.5) # Simulate backend processing
+        # except httpx.HTTPStatusError as e:
+        #     ui.notify(f"API Error for '{action_name}': {e.response.status_code}", type='negative')
+        #     # action_successful = False # (ensure action_successful is defined and handled)
+        #     return
+        # except httpx.RequestError as e:
+        #     ui.notify(f"Network Error for '{action_name}': {e}", type='negative')
+        #     # action_successful = False
+        #     return
+        # --- END MODIFIED/EXAMPLE BACKEND CALL ---
+
     final_prompt_text = prompt_template
+    # Substitute placeholders in prompt_template with user_provided_inputs
+    for key, value in user_provided_inputs.items():
+        placeholder = f"{{{key}}}"
+        if placeholder in final_prompt_text:
+            final_prompt_text = final_prompt_text.replace(placeholder, str(value))
+
     if '{selected_doc_titles_list}' in final_prompt_text:
         titles_list_str = "\n - " + "\n - ".join(doc_titles_for_prompt) if doc_titles_for_prompt else "N/A"
         final_prompt_text = final_prompt_text.replace('{selected_doc_titles_list}', titles_list_str)
@@ -264,19 +431,21 @@ async def process_dynamic_action(
     chat_messages_display_ref = page_ui_state.get('chat_messages_display_ref')
     chat_container_id = page_ui_state.get('chat_container_id')
 
-    action_successful = True
+    action_successful = True  # Assume success initially
 
     if output_destination == 'chat_message':
         if action_type in ['set_chat_persona', 'inject_chat_prompt']:
             if chat_input_ref and send_message_func:
                 chat_input_ref.value = final_prompt_text
-                await send_message_func(chat_input_ref) # This will handle its own scrolling
+                await send_message_func(chat_input_ref)
                 ui.notify(f"'{action_name}' prompt added to chat.", type='positive')
             else:
                 ui.notify("Chat interface not available to inject prompt.", type='error')
                 action_successful = False
         elif action_type == 'process_documents':
-            ai_response_text = f"AI response for '{action_name}'{context_info}:\n{final_prompt_text}\n(This is a mock response based on the action.)"
+            # This part might be superseded if process_documents now always calls a backend
+            # and the result is handled differently (e.g., new document or direct chat response from backend)
+            ai_response_text = f"AI response for '{action_name}'{context_info}:\n{final_prompt_text}\n(This is a mock response based on the action and your inputs.)"
             ai_msg_data = {
                 'id': f'chat_ai_action_{uuid.uuid4().hex[:6]}',
                 'text': ai_response_text,
@@ -285,11 +454,10 @@ async def process_dynamic_action(
             }
             saved_ai_msg = await api_save_chat_message(project_id, stream_id, ai_msg_data)
             if saved_ai_msg:
-                print(chat_container_id)
                 if chat_messages_display_ref:
                     chat_messages_display_ref.refresh()
                 if chat_container_id:
-                    await scroll_chat_to_bottom(chat_container_id) # Use helper
+                    await scroll_chat_to_bottom(chat_container_id)
                 ui.notify(f"'{action_name}' processed. See chat for mock AI response.", type='positive')
             else:
                 ui.notify("Failed to save AI action response via API.", type='error')
@@ -299,22 +467,29 @@ async def process_dynamic_action(
             action_successful = False
 
     elif output_destination == 'new_document':
+        # The backend call for 'process_documents' might already handle this.
+        # If this is a separate flow, ensure user_provided_inputs are included.
         payload_for_backend = {
             "project_id": project_id, "stream_id": stream_id, "action_id": action_id,
-            "action_name": action_name, "selected_paper_ids": selected_paper_ids, "prompt": final_prompt_text
+            "action_name": action_name, "selected_paper_ids": selected_paper_ids,
+            "prompt": final_prompt_text,
+            "user_inputs": user_provided_inputs  # Add collected inputs
         }
         print(f"PAYLOAD FOR NEW DOCUMENT (mock backend call): {payload_for_backend}")
+        # This is where you would make the actual API call to your backend
+        # e.g., await api_client.post("/actions/create_document", json=payload_for_backend)
         with _context:
             ui.notify(
-            f"'{action_name}'{context_info} would trigger generation of a new document (see console for mock payload).",
-            type='info', multi_line=True, close_button='OK')
-        await asyncio.sleep(1.5)
+                f"'{action_name}'{context_info} would trigger generation of a new document with your inputs (see console for mock payload).",
+                type='info', multi_line=True, close_button='OK')
+        await asyncio.sleep(1.5)  # Simulate backend call or user reading time
 
     else:
         with _context:
             ui.notify(f"Unknown output destination '{output_destination}' for action '{action_name}'.", type='warning')
         action_successful = False
 
+    # Final notification logic (remains the same)
     async def final_notification_task():
         await asyncio.sleep(0.1)
         page_ui_state['last_action_completed_details'] = {
@@ -322,7 +497,125 @@ async def process_dynamic_action(
             'status': 'success' if action_successful else 'error',
             'timestamp': datetime.now().isoformat()
         }
+
     asyncio.create_task(final_notification_task())
+
+
+# async def process_dynamic_action(
+#         project_id: str,
+#         stream_id: str,
+#         action_id: str,
+#         selected_paper_ids: list[str],
+#         page_ui_state: dict,
+#         _context
+# ):
+#     action_details = await api_get_dynamic_action_by_id(action_id)
+#     if not action_details:
+#         print('no action details')
+#         return
+#
+#     action_name = action_details.get('name', 'Unknown Action')
+#     action_type = action_details.get('action_type')
+#     output_destination = action_details.get('output_destination')
+#     prompt_template = action_details.get('prompt_template', "")
+#
+#     with _context:
+#         ui.notify(f"Initiating '{action_name}'...", type='info')
+#
+#     context_info = ""
+#     doc_titles_for_prompt = []
+#
+#     if action_type == 'process_documents':
+#         if not selected_paper_ids:
+#             with _context:
+#                 ui.notify(f"Please select paper(s) from the 'Papers' tab to perform '{action_name}'.", type='warning')
+#             page_ui_state['last_action_completed_details'] = {
+#                 'action_name': action_name, 'status': 'warning',
+#                 'message': f"Action '{action_name}' not performed: No papers selected.",
+#                 'timestamp': datetime.now().isoformat()
+#             }
+#             return
+#         current_papers = await api_load_papers_for_stream(project_id, stream_id)
+#         selected_titles = [get_paper_title_by_id_from_list(pid, current_papers) for pid in selected_paper_ids]
+#         doc_titles_for_prompt = selected_titles
+#         context_info = f" on: {', '.join(selected_titles)}"
+#         if not selected_titles or all(title == "Unknown Paper" for title in selected_titles):
+#             ui.notify(f"Could not find titles for selected papers for '{action_name}'.", type='warning')
+#
+#         requests.post('http://127.0.0.1:8000/generation/executive_summary', json={'subject_matter':'Rural Broadband in America.',
+#                                                                                    'focus':'Historical, current, and future challenges for rural broadband and connectivity in America.',
+#                                                                                    'project_id':project_id,
+#                                                                                    'stream_id':stream_id,
+#                                                                                    'selected_documents':[pid for pid in selected_paper_ids]})
+#     final_prompt_text = prompt_template
+#     if '{selected_doc_titles_list}' in final_prompt_text:
+#         titles_list_str = "\n - " + "\n - ".join(doc_titles_for_prompt) if doc_titles_for_prompt else "N/A"
+#         final_prompt_text = final_prompt_text.replace('{selected_doc_titles_list}', titles_list_str)
+#
+#     chat_input_ref = page_ui_state.get('chat_input_ref')
+#     send_message_func = page_ui_state.get('send_message_func')
+#     chat_messages_display_ref = page_ui_state.get('chat_messages_display_ref')
+#     chat_container_id = page_ui_state.get('chat_container_id')
+#
+#     action_successful = True
+#
+#     if output_destination == 'chat_message':
+#         if action_type in ['set_chat_persona', 'inject_chat_prompt']:
+#             if chat_input_ref and send_message_func:
+#                 chat_input_ref.value = final_prompt_text
+#                 await send_message_func(chat_input_ref) # This will handle its own scrolling
+#                 ui.notify(f"'{action_name}' prompt added to chat.", type='positive')
+#             else:
+#                 ui.notify("Chat interface not available to inject prompt.", type='error')
+#                 action_successful = False
+#         elif action_type == 'process_documents':
+#             ai_response_text = f"AI response for '{action_name}'{context_info}:\n{final_prompt_text}\n(This is a mock response based on the action.)"
+#             ai_msg_data = {
+#                 'id': f'chat_ai_action_{uuid.uuid4().hex[:6]}',
+#                 'text': ai_response_text,
+#                 'sent_by_user': False,
+#                 'avatar': 'https://robohash.org/ai_action.png?size=40x40',
+#             }
+#             saved_ai_msg = await api_save_chat_message(project_id, stream_id, ai_msg_data)
+#             if saved_ai_msg:
+#                 print(chat_container_id)
+#                 if chat_messages_display_ref:
+#                     chat_messages_display_ref.refresh()
+#                 if chat_container_id:
+#                     await scroll_chat_to_bottom(chat_container_id) # Use helper
+#                 ui.notify(f"'{action_name}' processed. See chat for mock AI response.", type='positive')
+#             else:
+#                 ui.notify("Failed to save AI action response via API.", type='error')
+#                 action_successful = False
+#         else:
+#             ui.notify(f"Unsupported action type '{action_type}' for chat message output.", type='warning')
+#             action_successful = False
+#
+#     elif output_destination == 'new_document':
+#         payload_for_backend = {
+#             "project_id": project_id, "stream_id": stream_id, "action_id": action_id,
+#             "action_name": action_name, "selected_paper_ids": selected_paper_ids, "prompt": final_prompt_text
+#         }
+#         print(f"PAYLOAD FOR NEW DOCUMENT (mock backend call): {payload_for_backend}")
+#         with _context:
+#             ui.notify(
+#             f"'{action_name}'{context_info} would trigger generation of a new document (see console for mock payload).",
+#             type='info', multi_line=True, close_button='OK')
+#         await asyncio.sleep(1.5)
+#
+#     else:
+#         with _context:
+#             ui.notify(f"Unknown output destination '{output_destination}' for action '{action_name}'.", type='warning')
+#         action_successful = False
+#
+#     async def final_notification_task():
+#         await asyncio.sleep(0.1)
+#         page_ui_state['last_action_completed_details'] = {
+#             'action_name': action_name,
+#             'status': 'success' if action_successful else 'error',
+#             'timestamp': datetime.now().isoformat()
+#         }
+#     asyncio.create_task(final_notification_task())
 
 
 async def create_project_workspace_content(project_id: str, stream_id: str) -> None:
@@ -485,6 +778,7 @@ async def create_project_workspace_content(project_id: str, stream_id: str) -> N
                                         p_id = paper_item.get('id')
                                         p_title = paper_item.get('title', 'Untitled Paper')
                                         p_content = paper_item.get('content', 'No content.')
+                                        print(p_id)
 
                                         with ui.row().classes('items-center w-full no-wrap'):
                                             ui.checkbox(
@@ -698,6 +992,7 @@ async def create_project_workspace_content(project_id: str, stream_id: str) -> N
                                     else:
                                         with ui.column().classes('gap-2 w-full mt-2'):
                                             for action_item in document_actions:
+                                                print(action_item)
                                                 ui.button(
                                                     action_item['name'],
                                                     on_click=lambda bound_action_id=action_item['id']: asyncio.create_task(
