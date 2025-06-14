@@ -75,6 +75,19 @@ CREATE TABLE IF NOT EXISTS dynamic_actions (
     is_user_defined INTEGER
 );
 
+CREATE TABLE IF NOT EXISTS prompts (
+    id TEXT PRIMARY KEY,
+    prompt TEXT NOT NULL,
+    prompt_name TEXT,
+    action_name TEXT,
+    variables TEXT,
+    description TEXT,
+    source_target TEXT,
+    output_document_type TEXT,
+    heuristic TEXT,
+    output_document_class TEXT
+);
+
 INSERT INTO dynamic_actions (id, name, description, action_type, output_destination, prompt_template, ui_group, required_inputs, is_user_defined)
 VALUES
 ('generate_custom_summary', 'Generate Custom Summary', 'Generates a summary based on user-provided subject and focus.', 'process_documents', 'new_document', 'Summarize the selected documents focusing on {subject_matter} regarding {focus}. Selected documents:\n{selected_doc_titles_list}', 'document_actions',

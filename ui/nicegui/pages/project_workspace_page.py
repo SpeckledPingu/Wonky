@@ -164,7 +164,7 @@ async def api_clear_chat_messages(project_id: str, stream_id: str) -> bool:
 async def api_get_dynamic_actions_by_group(ui_group: str) -> list[dict]:
     """Fetches dynamic actions/prompts for a specific UI group from the API."""
     try:
-        response = await api_client.get(f"/dynamic-actions", params={"ui_group": ui_group})
+        response = await api_client.get(f"/get-dynamic-actions", params={"ui_group": 'document_actions'})
         response.raise_for_status()
         return response.json()
     except httpx.HTTPStatusError as e:
@@ -232,6 +232,7 @@ async def prompt_for_action_inputs(inputs_config_str_or_list: str | list, action
         try:
             inputs_config = json.loads(inputs_config_str_or_list)
         except json.JSONDecodeError:
+            print(inputs_config_str_or_list)
             print(f"Error: Could not parse required_inputs JSON for action '{action_name}'")
             ui.notify(f"Configuration error for '{action_name}': Invalid input definitions.", type='negative')
             return None  # Indicates an error or cancellation
@@ -334,10 +335,10 @@ async def process_dynamic_action(
     required_inputs_config = action_details.get('required_inputs')  # Expecting list of dicts or JSON string
     required_inputs_config = """[
         {"name": "subject_matter", "label": "Subject Matter", "type": "text", "required": true, "default": "General Overview"},
-        {"name": "focus", "label": "Specific Focus", "type": "textarea", "required": true, "default": "Key challenges and opportunities"},
-        {"name": "max_length", "label": "Max Summary Length (words)", "type": "number", "required": false, "default": 250}
+        {"name": "focus", "label": "Specific Focus", "type": "textarea", "required": true, "default": "Key challenges and opportunities"}
     ]"""
     user_provided_inputs = {}
+    print(required_inputs_config)
     if required_inputs_config:
         # Pass the _context for the dialog to be rendered within the correct UI scope
         user_provided_inputs = await prompt_for_action_inputs(
@@ -396,6 +397,7 @@ async def process_dynamic_action(
         backend_payload.update(user_provided_inputs)
 
         # Example: If your action 'generate_custom_summary' calls a specific endpoint
+
         # You might need to make this endpoint configurable in action_details too.
         # For now, let's assume a generic endpoint or that the backend routes based on action_id.
         # This is a MOCK call. Replace with your actual API endpoint.
@@ -471,13 +473,15 @@ async def process_dynamic_action(
         # If this is a separate flow, ensure user_provided_inputs are included.
         payload_for_backend = {
             "project_id": project_id, "stream_id": stream_id, "action_id": action_id,
-            "action_name": action_name, "selected_paper_ids": selected_paper_ids,
-            "prompt": final_prompt_text,
+            "action_name": action_name,
+            "selected_documents": selected_paper_ids,
+            # "prompt": final_prompt_text,
             "user_inputs": user_provided_inputs  # Add collected inputs
         }
         print(f"PAYLOAD FOR NEW DOCUMENT (mock backend call): {payload_for_backend}")
         # This is where you would make the actual API call to your backend
         # e.g., await api_client.post("/actions/create_document", json=payload_for_backend)
+        _ = await api_client.post("/actions/execute_dynamic_action", json=payload_for_backend)
         with _context:
             ui.notify(
                 f"'{action_name}'{context_info} would trigger generation of a new document with your inputs (see console for mock payload).",
@@ -1021,7 +1025,7 @@ async def create_project_workspace_content(project_id: str, stream_id: str) -> N
                                                 ).props('color=info outline dense').tooltip(persona_action.get('description', ''))
 
                                     ui.label("Explore Tangents:").classes("text-sm font-medium mt-4")
-                                    guided_tangents = await api_get_dynamic_actions_by_group('guided_tangents')
+                                    guided_tangents = await api_get_dynamic_actions_by_group('document_actions')
                                     if not guided_tangents:
                                         ui.label("No tangents configured.").classes('text-xs text-gray-500')
                                     else:
