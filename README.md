@@ -227,11 +227,18 @@ and follows the other principle of: ***LLMs need sufficient context to work well
 ### Note:
 This is a work in progress and recently underwent some major theoretical changes that will make future progress easier and more iterative. There have been revisions to the UI as well as refining the theory of MLR-Heuristics since this started, complete with the
 intersection of taxonomies, ontologies, and knowledge graphs. Work will develop as it goes on and the rag will be modified soon and shifted to the heuristic patterns.
-- [ ] Update RAG to the structured document
-- [ ] Add code for obtaining EveryCRSReport
+- [x] Update RAG to the structured document
+- [x] Add code for obtaining EveryCRSReport
+- [ ] Add table build scripts and dummy data
 - [ ] Add ingestion code for CRS reports
-- [ ] Standardize RAG structures
+- [ ] Standardize Burr Flows
+- [ ] Add Actions
+- [ ] Add Competency Questions
+- [x] Standardize RAG structures
 - [ ] Add additional flows
-- [ ] Add research actions
+- [x] Add research actions
 - [ ] Add chat system
+- [ ] Add search documents and add functionality
 - [ ] Build prompt library
+- [ ] Solr Search adaptors
+- [ ] Elastic Search adaptors
