@@ -48,7 +48,7 @@
           My Projects
         </h2>
         <div v-if="projects.length === 0" class="text-center text-gray-500 py-10">
-          <p class="text-lg">No projects yet. Create one above to get started!</p>
+          <p class="text-lg">Loading projects or none found. Create one above to get started!</p>
         </div>
         <div v-else class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           <ProjectCard v-for="project in projects" :key="project.id" :project="project" />
@@ -59,54 +59,79 @@
 </template>
 
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import ProjectCard from '../components/ProjectCard.vue';
 import { PlusCircle, Plus, FolderKanban, Rocket } from 'lucide-vue-next';
 
 const router = useRouter();
+const API_BASE_URL = 'http://localhost:8000';
 
 const newProject = ref({
-  id: '',
   name: '',
   goal: '',
   description: '',
-  sources: 0,
-  date: ''
 });
 
-const projects = ref([
-  { id: '1', name: 'United States Universal Service Fund Overview', goal: 'Understand USF', description: 'Deep dive into USF.', sources: 6, date: 'May 31, 2025', icon: 'BarChart3' },
-  { id: '2', name: "USDA's ReConnect Program", goal: 'Analyze ReConnect', description: 'Expanding broadband access.', sources: 5, date: 'May 25, 2025', icon: 'Network' },
-  { id: '3', name: 'Untitled notebook', goal: 'General notes', description: '', sources: 0, date: 'May 25, 2025', icon: 'FileText' },
-  { id: '4', name: 'Indiana Advance Health Directives Guide', goal: 'Health directives', description: 'Guide for Indiana.', sources: 3, date: 'May 22, 2025', icon: 'FileHeart' },
-]);
+const projects = ref([]);
 
-const createProject = () => {
-  if (newProject.value.name && newProject.value.goal) {
-    const createdProject = {
-      ...newProject.value,
-      id: String(Date.now()), // Simple ID generation
-      sources: 0,
-      date: new Date().toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' }),
-      icon: 'FilePlus' // Default icon for new projects
-    };
-    projects.value.unshift(createdProject); // Add to the beginning of the list
-
-    router.push({
-        name: 'ProjectSetupView',
-        params: {
-            projectId: createdProject.id,
-            projectName: createdProject.name
-        }
-    });
-
-    newProject.value = { name: '', goal: '', description: '' };
+const fetchProjects = async () => {
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/projects`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    projects.value = await response.json();
+  } catch (error) {
+    console.error("Failed to fetch projects:", error);
+    alert("Could not load projects. Please ensure the backend is running and accessible.");
   }
 };
 
-// Removed navigateToSetup method as it's no longer directly triggered by ProjectCard from this view.
-// ProjectCard now handles its own navigation.
+onMounted(() => {
+  fetchProjects();
+});
+
+const createProject = async () => {
+  if (newProject.value.name && newProject.value.goal) {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/projects`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          name: newProject.value.name,
+          goal: newProject.value.goal,
+          description: newProject.value.description || null,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const createdProject = await response.json();
+
+      // Navigate to the setup page for the new project
+      router.push({
+        name: 'ProjectSetupView',
+        params: {
+          projectId: createdProject.id,
+          projectName: createdProject.name,
+        },
+      });
+
+      // Reset the form and refresh the project list for when the user navigates back
+      newProject.value = { name: '', goal: '', description: '' };
+      await fetchProjects();
+
+    } catch (error) {
+      console.error("Error creating project:", error);
+      alert("There was an error creating the project. Please try again.");
+    }
+  }
+};
 
 </script>
 

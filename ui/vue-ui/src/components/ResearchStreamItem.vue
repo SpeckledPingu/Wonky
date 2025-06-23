@@ -3,7 +3,7 @@
     <div class="flex justify-between items-center cursor-pointer mb-2" @click="toggleExpandLocal">
       <h3 class="text-sm font-semibold text-gray-700 flex items-center">
         <ChevronRight class="h-4 w-4 mr-1 transition-transform duration-200" :class="{'rotate-90': isExpandedLocal}" />
-        {{ stream.name }}
+        {{ stream.subject }}
       </h3>
       <input type="checkbox"
              :checked="allDocumentsSelected"
@@ -43,13 +43,13 @@ const props = defineProps({
     type: Array,
     default: () => []
   },
-  highlightedDocumentIds: { // New prop
+  highlightedDocumentIds: {
     type: Array,
     default: () => []
   }
 });
 
-const emit = defineEmits(['toggle-expand', 'document-click', 'update:selectedDocuments', 'select-all', 'deselect-all']);
+const emit = defineEmits(['toggle-expand', 'document-click', 'update:selectedDocuments']);
 
 const isExpandedLocal = ref(props.isExpanded);
 const localSelectedDocuments = ref([...props.selectedDocuments]);
@@ -93,14 +93,9 @@ const allDocumentsSelected = computed(() => {
 
 const toggleSelectAll = (event) => {
     const shouldSelectAll = event.target.checked;
-    if (shouldSelectAll) {
-        localSelectedDocuments.value = props.stream.documents.map(doc => doc.id);
-        emit('select-all');
-    } else {
-        localSelectedDocuments.value = [];
-        emit('deselect-all');
-    }
-    emit('update:selectedDocuments', [...localSelectedDocuments.value]);
+    const newSelection = shouldSelectAll ? props.stream.documents.map(doc => doc.id) : [];
+    localSelectedDocuments.value = newSelection;
+    emit('update:selectedDocuments', newSelection);
 };
 
 </script>

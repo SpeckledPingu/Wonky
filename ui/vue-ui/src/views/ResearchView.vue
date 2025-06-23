@@ -47,9 +47,22 @@
               </button>
             </div>
             <div class="flex-1 overflow-y-auto p-4 space-y-4" v-if="activeLeftPanelTab === 'streams'">
-              <div class="flex justify-between items-center mb-1"> <h2 class="text-base font-semibold text-gray-700">Document Streams</h2> </div>
-              <div v-for="stream in researchStreams" :key="stream.id" class="mb-3">
-                  <ResearchStreamItem :stream="stream" :is-expanded="expandedStreams[stream.id]" :highlighted-document-ids="highlightedDocumentIds" @toggle-expand="toggleStreamExpand(stream.id)" @select-all="selectAllDocuments(stream.id, true)" @deselect-all="selectAllDocuments(stream.id, false)" @document-click="handleDocumentClick" v-model:selected-documents="selectedDocumentsPerStream[stream.id]" />
+              <div class="flex justify-between items-center mb-1">
+                <h2 class="text-base font-semibold text-gray-700">Document Streams</h2>
+                <button v-if="focusedStreamId" @click="focusedStreamId = null"
+                        class="text-xs text-blue-600 hover:text-blue-800 flex items-center">
+                  <List class="h-3 w-3 mr-1"/> View All Streams
+                </button>
+              </div>
+              <div v-for="stream in displayedResearchStreams" :key="stream.id" class="mb-3">
+                  <ResearchStreamItem
+                    :stream="stream"
+                    :is-expanded="expandedStreams[stream.id]"
+                    :highlighted-document-ids="highlightedDocumentIds"
+                    @toggle-expand="toggleStreamExpand(stream.id)"
+                    @document-click="handleDocumentClick"
+                    v-model:selected-documents="selectedDocumentsPerStream[stream.id]"
+                  />
               </div>
               <div v-if="researchStreams.length === 0" class="text-center text-gray-500 py-10"> <FileTextIcon class="h-10 w-10 mx-auto text-gray-400 mb-2"/> <p class="text-sm">No research streams available.</p> </div>
             </div>
@@ -74,12 +87,38 @@
         :style="{ flexBasis: `${centerPanelWidthPercent}%` }"
         class="flex flex-col overflow-hidden p-4 bg-gray-50 flex-shrink-0"
         >
-        <div class="flex justify-between items-center mb-4"> <h2 class="text-lg font-semibold text-gray-700">Chat</h2> <MessageCircle class="h-5 w-5 text-gray-500" /> </div>
-        <div class="flex-1 overflow-y-auto bg-white rounded-lg shadow p-4 mb-4 space-y-4" ref="chatMessagesContainerRef">
-          <div v-for="message in chatMessages" :key="message.id" :class="['flex', message.isUser ? 'justify-end' : 'justify-start']"> <div :class="['max-w-xs lg:max-w-md px-4 py-2 rounded-lg shadow', message.isUser ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800']"> <p class="text-sm break-words">{{ message.text }}</p> <span class="text-xs opacity-70 block mt-1">{{ message.isUser ? 'You' : 'Assistant' }} - {{ message.time }}</span> </div> </div>
-          <div v-if="chatMessages.length === 0" class="text-center text-gray-400 h-full flex flex-col justify-center items-center"> <MessageSquareDashed class="h-12 w-12 mx-auto text-gray-400 mb-2"/> <p>No messages yet.</p> </div>
+        <!-- New Tab Navigation for Center Panel -->
+        <div class="flex border-b border-gray-200 flex-shrink-0 mb-4">
+          <button
+            v-for="tab in centerPanelTabs" :key="tab.id"
+            @click="activeCenterPanelTab = tab.id"
+            :class="['flex-1 py-2.5 px-3 text-xs font-medium text-center focus:outline-none transition-colors', activeCenterPanelTab === tab.id ? 'border-b-2 border-blue-500 text-blue-600 bg-blue-50' : 'text-gray-500 hover:text-gray-700 hover:bg-gray-50']"
+          >
+            <component :is="tab.icon" class="h-4 w-4 inline-block mr-1 mb-0.5" /> {{ tab.name }}
+          </button>
         </div>
-        <div class="mt-auto"> <form @submit.prevent="sendChatMessage()" class="flex items-center bg-white p-2 rounded-lg shadow"> <input type="text" v-model="newMessage" placeholder="Start typing..." class="flex-grow px-4 py-2 border-none focus:ring-0 rounded-lg text-sm" /> <button type="submit" class="p-2 text-blue-500 hover:text-blue-700 rounded-full"> <Send class="h-5 w-5" /> </button> </form> </div>
+
+        <!-- Chat Content (conditional) -->
+        <div v-if="activeCenterPanelTab === 'chat'" class="flex-1 flex flex-col">
+          <div class="flex-1 overflow-y-auto bg-white rounded-lg shadow p-4 mb-4 space-y-4" ref="chatMessagesContainerRef">
+            <div v-for="message in chatMessages" :key="message.id" :class="['flex', message.isUser ? 'justify-end' : 'justify-start']"> <div :class="['max-w-xs lg:max-w-md px-4 py-2 rounded-lg shadow', message.isUser ? 'bg-blue-500 text-white' : 'bg-gray-200 text-gray-800']"> <p class="text-sm break-words">{{ message.text }}</p> <span class="text-xs opacity-70 block mt-1">{{ message.isUser ? 'You' : 'Assistant' }} - {{ message.time }}</span> </div> </div>
+            <div v-if="chatMessages.length === 0" class="text-center text-gray-400 h-full flex flex-col justify-center items-center"> <MessageSquareDashed class="h-12 w-12 mx-auto text-gray-400 mb-2"/> <p>No messages yet.</p> </div>
+          </div>
+          <div class="mt-auto"> <form @submit.prevent="sendChatMessage" class="flex items-center bg-white p-2 rounded-lg shadow"> <input type="text" v-model="newMessage" placeholder="Start typing..." class="flex-grow px-4 py-2 border-none focus:ring-0 rounded-lg text-sm" /> <button type="submit" class="p-2 text-blue-500 hover:text-blue-700 rounded-full"> <Send class="h-5 w-5" /> </button> </form> </div>
+        </div>
+
+        <!-- Source Documents Content (conditional) -->
+        <!-- Find and replace the existing SourceDocumentsView tag -->
+        <SourceDocumentsView
+          v-if="activeCenterPanelTab === 'documents'"
+          :documents="unfilteredAllProjectDocuments"
+          :project-id="projectId"
+          :highlighted-document-ids="highlightedDocumentIds"
+          :initial-selected-document-id="selectedDocumentForHierarchy"
+          @document-click="handleDocumentClick"
+          class="flex-1"
+        />
+
       </main>
 
       <div
@@ -131,7 +170,7 @@
                             <button v-for="persona in personas" :key="persona.id"
                                 @click="selectPersona(persona)"
                                 :class="['btn btn-sm text-xs py-2 flex items-center justify-center transition-colors', selectedPersona?.id === persona.id ? 'bg-sky-600 text-white' : 'bg-sky-100 text-sky-700 hover:bg-sky-200']">
-                                <component :is="persona.icon" class="h-4 w-4 mr-1.5"/> {{ persona.name }}
+                                <component :is="getIconComponent(persona.icon)" class="h-4 w-4 mr-1.5"/> {{ persona.name }}
                             </button>
                         </div>
                     </div>
@@ -143,7 +182,7 @@
                              <button v-for="tangent in tangents" :key="tangent.id"
                                 @click="selectTangent(tangent)"
                                 :class="['w-full btn btn-sm text-xs py-2 flex items-center justify-center transition-colors', selectedTangent?.id === tangent.id ? 'bg-amber-600 text-white' : 'bg-amber-100 text-amber-700 hover:bg-amber-200']">
-                                <component :is="tangent.icon" class="h-4 w-4 mr-1.5"/> {{ tangent.name }}
+                                <component :is="getIconComponent(tangent.icon)" class="h-4 w-4 mr-1.5"/> {{ tangent.name }}
                             </button>
                         </div>
                     </div>
@@ -182,6 +221,10 @@ import MarkdownViewer from '../components/MarkdownViewer.vue';
 import TimelineView from '../components/TimelineView.vue';
 import GraphView from '../components/GraphView.vue';
 import ImportantSubjectsPanel from '../components/ImportantSubjectsPanel.vue';
+import SourceDocumentsView from '../components/SourceDocumentsView.vue'; // NEW: Import the new component
+
+// Import all Lucide icons to be able to map them by string name
+import * as LucideIcons from 'lucide-vue-next';
 
 import {
   ArrowLeft, BarChart2, Share2, UserCircle, MessageCircle, Send, Sparkles, PlayCircle, Users, FileText as FileTextIconOriginal,
@@ -194,6 +237,7 @@ const FileTextIcon = FileTextIconOriginal;
 
 const route = useRoute();
 const router = useRouter();
+const API_BASE_URL = 'http://localhost:8000';
 
 // --- Refs for DOM elements ---
 const mainContentAreaRef = ref(null);
@@ -219,7 +263,7 @@ const initialRightPanelWidthPx = ref(0);
 const minPanelPercent = 10; // Minimum panel width
 
 // --- Panel Visibility ---
-const isRightPanelEffectivelyVisible = ref(true); // Default to false, will be set in onMounted
+const isRightPanelEffectivelyVisible = ref(true);
 
 // --- Project Data State ---
 const projectId = ref(null);
@@ -230,30 +274,23 @@ const selectedDocumentsPerStream = ref({});
 const highlightedDocumentIds = ref([]);
 const viewingDocument = ref(false);
 const currentDocument = ref(null);
+const focusedStreamId = ref(null); // To store the ID of the focused stream
+const selectedDocumentForHierarchy = ref(null); // NEW reactive state for SourceDocumentsView
 
 // --- UI State ---
 const activeLeftPanelTab = ref('streams');
 const activeRightPanelTab = ref('actions');
+const activeCenterPanelTab = ref('chat'); // NEW: Default to chat tab in center
 const newMessage = ref('');
 const chatMessages = ref([]);
 const currentNoteContent = ref('');
 
-// --- Static Data / Configs ---
-const userDefinedActions = ref([
-    { id: 'userAction1', name: 'Analyze Fiscal Impact (Custom)', promptContent: 'System: You are an economist... Analysis: Analyze the fiscal impact of the selected documents focusing on budget neutrality.'},
-    { id: 'userAction2', name: 'Identify Public Sentiment Trends', promptContent: 'System: You are a social media analyst... Analysis: Identify public sentiment trends related to the core topics in the selected documents.'}
-]);
-const personas = ref([
-    { id: 'analyst', name: 'Policy Analyst', icon: UserCog, promptStart: "As a seasoned policy analyst, let's examine this. " },
-    { id: 'legal', name: 'Legal Expert', icon: Scale, promptStart: "From a legal perspective, considering relevant case law and statutes, " },
-    { id: 'economist', name: 'Economist', icon: Brain, promptStart: "Analyzing the economic implications, including costs and benefits, " }
-]);
+// --- Dynamic Configuration Data State (formerly hardcoded) ---
+const userDefinedActions = ref([]); // Now fetched from backend
+const personas = ref([]); // Now fetched from backend
+const tangents = ref([]); // Now fetched from backend
+
 const selectedPersona = ref(null);
-const tangents = ref([
-    { id: 'explore', name: 'Explore Ideas', icon: Lightbulb, promptStart: "Let's brainstorm some innovative ideas related to this topic: " },
-    { id: 'counterfactuals', name: 'Identify Counterfactuals', icon: Shuffle, promptStart: "What if the key assumptions were different? Let's explore counterfactual scenarios: " },
-    { id: 'devilsAdvocate', name: "Devil's Advocate", icon: EyeOff, promptStart: "Playing devil's advocate, what are the strongest arguments against this? " }
-]);
 const selectedTangent = ref(null);
 const customDeepDiveInput = ref('');
 
@@ -262,6 +299,13 @@ const leftPanelTabs = ref([
     { id: 'timeline', name: 'Timeline', icon: Clock },
     { id: 'graph', name: 'Graph', icon: Spline }
 ]);
+
+// NEW: Tabs for the center panel
+const centerPanelTabs = ref([
+    { id: 'chat', name: 'Chat', icon: MessageCircle },
+    { id: 'documents', name: 'Documents', icon: FileTextIcon } // Using the aliased FileTextIcon
+]);
+
 const rightPanelTabs = ref([
     { id: 'actions', name: 'Actions', icon: Zap },
     { id: 'subjects', name: 'Subjects', icon: Tags },
@@ -275,19 +319,36 @@ const projectDisplayTitle = computed(() => {
     const name = projectName.value || "Unnamed Project";
     return name.length > 50 ? name.substring(0, 47) + "..." : name;
 });
+
+// Filter research streams based on focusedStreamId
+const displayedResearchStreams = computed(() => {
+  if (focusedStreamId.value) {
+    return researchStreams.value.filter(stream => stream.id === focusedStreamId.value);
+  }
+  return researchStreams.value;
+});
+
+// Update allProjectDocuments to also respect focusedStreamId
 const allProjectDocuments = computed(() => {
-  return researchStreams.value.reduce((acc, stream) => {
-    return acc.concat(stream.documents.map(doc => ({...doc, streamName: stream.name, streamId: stream.id })));
+  let streamsToProcess = researchStreams.value;
+  if (focusedStreamId.value) {
+    streamsToProcess = researchStreams.value.filter(stream => stream.id === focusedStreamId.value);
+  }
+  return streamsToProcess.reduce((acc, stream) => {
+    return acc.concat(stream.documents.map(doc => ({...doc, streamName: stream.subject, streamId: stream.id })));
   }, []);
 });
+
+
+// Utility to get Lucide icon component by string name
+const getIconComponent = (iconName) => {
+  return LucideIcons[iconName] || null; // Return the component or null if not found
+};
 
 // --- Methods ---
 const checkRightPanelVisibility = () => {
     if (typeof window !== 'undefined') {
-        // Changed breakpoint to 768px (md) for wider visibility. Add console.log for debugging.
-        const newVisibility = window.innerWidth >= 768;
-        console.log('Checking visibility: window.innerWidth =', window.innerWidth, 'md breakpoint (768px). New visibility =', newVisibility);
-        isRightPanelEffectivelyVisible.value = newVisibility;
+        isRightPanelEffectivelyVisible.value = window.innerWidth >= 768;
     }
 };
 
@@ -299,29 +360,80 @@ const scrollToBottom = () => {
   });
 };
 
-const loadProjectData = () => {
-  console.log("loadProjectData called. Project ID:", projectId.value, "Project Name:", projectName.value);
-  if (projectId.value && projectName.value) {
-    researchStreams.value = [];
-    expandedStreams.value = {};
-    selectedDocumentsPerStream.value = {};
-    highlightedDocumentIds.value = [];
+// Function to load static configuration data from backend
+const loadStaticData = async () => {
+  try {
+    const [personasRes, tangentsRes, userActionsRes] = await Promise.all([
+      fetch(`${API_BASE_URL}/api/personas`),
+      fetch(`${API_BASE_URL}/api/tangents`),
+      fetch(`${API_BASE_URL}/api/user-actions`)
+    ]);
 
-    const mockStreamsData = [
-        { id: 'stream1', name: 'USF History - Key legislative milestones', documents: [ { id: 'doc1a', name: 'Telecommunications Act of 1996 Summary.pdf', type: 'pdf', publicationDate: '1996-02-08', subjects: ['Telecommunications', 'USF', 'Legislation'], keyPlayers: ['Congress', 'FCC'], linkedDocIds: ['doc1b'], content: '# Telecommunications Act of 1996...' }, { id: 'doc1b', name: 'Early USF initiatives.docx', type: 'docx', publicationDate: '1998-05-20', subjects: ['USF', 'Rural Broadband'], keyPlayers: ['FCC'], parentId: 'doc1a', content: '## Early USF Initiatives...' }, ] },
-        { id: 'stream2', name: 'Rural Broadband Impact - Case studies and statistics', documents: [ { id: 'doc2a', name: 'Appalachian Broadband Report.pdf', type: 'pdf', publicationDate: '2021-11-15', subjects: ['Rural Broadband', 'Economic Impact', 'Appalachia'], keyPlayers: ['Appalachian Regional Commission'], content: '# Appalachian Broadband Report...' }, { id: 'doc2b', name: 'Midwest Connectivity Status.xlsx', type: 'xlsx', publicationDate: '2022-03-01', subjects: ['Rural Broadband', 'Midwest USA', 'Statistics'], keyPlayers: [], content: 'Spreadsheet data...' }, { id: 'doc2c', name: 'Future of Rural Digital Equity.md', type: 'md', publicationDate: '2023-01-10', subjects: ['Digital Equity', 'Rural Broadband', 'Policy Recommendation'], keyPlayers: ['NTIA'], linkedDocIds: ['doc2a', 'doc1b'], content: '### Future of Rural Digital Equity...' }, ] }
-    ];
-    researchStreams.value = mockStreamsData;
-    mockStreamsData.forEach(stream => {
-        expandedStreams.value[stream.id] = true;
-        selectedDocumentsPerStream.value[stream.id] = [];
-    });
-    chatMessages.value = [ { id: 'chat1', text: `Hello! How can I help you with project "${projectName.value || 'this project'}"?`, isUser: false, time: '10:30 AM' }, ];
-    scrollToBottom();
-  } else {
-    console.error("Data load failed: Project ID or Name is missing in loadProjectData.");
+    if (!personasRes.ok) throw new Error(`HTTP error! status: ${personasRes.status} for personas`);
+    if (!tangentsRes.ok) throw new Error(`HTTP error! status: ${tangentsRes.status} for tangents`);
+    if (!userActionsRes.ok) throw new Error(`HTTP error! status: ${userActionsRes.status} for user actions`);
+
+    personas.value = await personasRes.json();
+    tangents.value = await tangentsRes.json();
+    userDefinedActions.value = await userActionsRes.json();
+
+  } catch (error) {
+    console.error("Failed to load static configuration data:", error);
+    addAssistantMessage("Failed to load some configuration data. Please check the backend.", true);
   }
 };
+
+const loadProjectData = async () => {
+  console.log("Fetching project data for ID:", projectId.value);
+  if (!projectId.value) {
+    console.error("Data load failed: Project ID is missing.");
+    alert("Could not load project. Returning to projects list.");
+    router.push({ name: 'ProjectsView' });
+    return;
+  }
+
+  try {
+    const response = await fetch(`${API_BASE_URL}/api/projects/${projectId.value}`);
+    if (!response.ok) {
+      throw new Error(`HTTP error! status: ${response.status}`);
+    }
+    const projectData = await response.json();
+
+    researchStreams.value = projectData.researchStreams || [];
+
+
+    const newExpandedState = {};
+    const newSelectedDocsState = {};
+    (projectData.researchStreams || []).forEach(stream => {
+      newSelectedDocsState[stream.id] = [];
+      newExpandedState[stream.id] = true;
+    });
+
+    // Set focusedStreamId from route query
+    focusedStreamId.value = route.query.focusStream || null;
+
+    if (focusedStreamId.value && newExpandedState[focusedStreamId.value] !== undefined) {
+      const focusedStream = projectData.researchStreams.find(s => s.id === focusedStreamId.value);
+      if (focusedStream && focusedStream.documents.length === 0) {
+        activeRightPanelTab.value = 'notes';
+        addAssistantMessage(`Ready to research "${focusedStream.subject}". Add your first note or upload a document.`);
+      }
+    }
+
+    expandedStreams.value = newExpandedState;
+    selectedDocumentsPerStream.value = newSelectedDocsState;
+
+    if (chatMessages.value.length === 0) {
+        addAssistantMessage(`Hello! How can I help you with project "${projectName.value || 'this project'}"?`);
+    }
+
+  } catch (error) {
+    console.error("Failed to load project data:", error);
+    alert("Could not load project data from the server. Please check the connection and try again.");
+    router.push({ name: 'ProjectsView' });
+  }
+};
+
 
 const startResize = (event, resizer) => {
   event.preventDefault();
@@ -374,54 +486,95 @@ const stopDrag = () => {
 };
 
 const toggleStreamExpand = (streamId) => { expandedStreams.value[streamId] = !expandedStreams.value[streamId]; };
-const selectAllDocuments = (streamId, select) => { const stream = researchStreams.value.find(s => s.id === streamId); if (stream) { selectedDocumentsPerStream.value[streamId] = select ? stream.documents.map(doc => doc.id) : []; } };
-const handleDocumentClick = (document) => { currentDocument.value = document; viewingDocument.value = true; };
+const handleDocumentClick = (document) => {
+  currentDocument.value = document;
+  viewingDocument.value = true;
+  // NEW: When a document is clicked, also switch to the 'documents' tab
+  // and set it as the root for hierarchy display.
+  activeCenterPanelTab.value = 'documents';
+  selectedDocumentForHierarchy.value = document.id;
+};
 const closeDocumentViewer = () => { viewingDocument.value = false; currentDocument.value = null; };
 
-const sendChatMessage = (initiatedBy = 'user', customText = null) => {
-    let messageText = customText !== null ? customText : newMessage.value.trim();
-    if (messageText === '') return;
-    const newMsg = { id: `chat${Date.now()}`, text: messageText, isUser: initiatedBy === 'user', time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) };
-    chatMessages.value.push(newMsg);
+const addAssistantMessage = (text, isError = false) => {
+    chatMessages.value.push({
+        id: `chat_${Date.now()}`,
+        text: text,
+        isUser: false,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
     scrollToBottom();
-    if (initiatedBy === 'user') {
-        const selectedDocsCount = Object.values(selectedDocumentsPerStream.value).flat().length;
-        let responseText = "I've received your message.";
-        if (messageText.toLowerCase().includes("executive summary")) { responseText = selectedDocsCount > 0 ? `Generating an executive summary based on the ${selectedDocsCount} selected document(s)...` : "Please select some documents to generate an executive summary."; }
-        else if (selectedDocsCount > 0) { responseText = `Okay, I will consider the ${selectedDocsCount} selected document(s).`; }
-        setTimeout(() => { chatMessages.value.push({ id: `chat${Date.now()}_assistant`, text: responseText, isUser: false, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) }); scrollToBottom(); }, 1000);
-        newMessage.value = '';
+};
+
+const sendChatMessage = async () => {
+    const messageText = newMessage.value.trim();
+    if (messageText === '') return;
+
+    // Add user message to chat immediately
+    chatMessages.value.push({
+        id: `chat_${Date.now()}`,
+        text: messageText,
+        isUser: true,
+        time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+    });
+    newMessage.value = '';
+    scrollToBottom();
+
+    try {
+        const payload = {
+            message: messageText,
+            selected_doc_ids: Object.values(selectedDocumentsPerStream.value).flat(),
+            persona_id: selectedPersona.value?.id || null,
+            tangent_id: selectedTangent.value?.id || null, // Pass tangent_id
+            custom_deep_dive: customDeepDiveInput.value.trim() || null // Pass custom_deep_dive
+        };
+        const response = await fetch(`${API_BASE_URL}/api/projects/${projectId.value}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        const data = await response.json();
+        addAssistantMessage(data.response_text);
+    } catch (error) {
+        console.error("Failed to get chat response:", error);
+        addAssistantMessage("Sorry, I couldn't get a response. Please try again.", true);
     }
 };
+
+const executeAction = async (actionId, customPrompt = null) => {
+    const action = userDefinedActions.value.find(a => a.id === actionId) || { name: actionId };
+    addAssistantMessage(`Executing action: "${action.name}"...`);
+
+    try {
+        const payload = {
+            action_id: actionId,
+            selected_doc_ids: Object.values(selectedDocumentsPerStream.value).flat(),
+            custom_prompt: customPrompt
+        };
+        const response = await fetch(`${API_BASE_URL}/api/projects/${projectId.value}/actions/run`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        const data = await response.json();
+        addAssistantMessage(data.response_text);
+    } catch (error) {
+        console.error(`Failed to execute action ${actionId}:`, error);
+        addAssistantMessage(`Sorry, there was an error running the action "${action.name}".`, true);
+    }
+};
+
+const runStudioAction = (actionType) => executeAction(actionType);
+const runUserAction = (action) => executeAction(action.id, action.promptContent);
 
 const goBackToSetup = () => {
   if (projectId.value && projectName.value) {
     router.push({ name: 'ProjectSetupView', params: { projectId: projectId.value, projectName: projectName.value } });
   } else {
-    console.error('Cannot navigate to setup: projectId or projectName is missing from reactive refs.');
-    alert('Error: Project details are missing. Cannot navigate to setup.');
     router.push({ name: 'ProjectsView' });
   }
-};
-
-const runStudioAction = (actionType) => {
-    console.log(`Run pre-defined studio action: ${actionType}`);
-    const selectedDocsCount = Object.values(selectedDocumentsPerStream.value).flat().length;
-    let message = `Pre-defined Action: "${actionType}" initiated.`;
-    if (selectedDocsCount > 0) { message += ` Processing with ${selectedDocsCount} selected document(s).`; }
-    else if (!['deepDive', 'generateAudio'].includes(actionType)) { message += ` No documents selected.`; }
-    chatMessages.value.push({ id: `action${Date.now()}`, text: message, isUser: false, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
-    scrollToBottom();
-};
-
-const runUserAction = (action) => {
-    console.log(`Run user-defined action: ${action.name}`, action.promptContent);
-    const selectedDocsCount = Object.values(selectedDocumentsPerStream.value).flat().length;
-    let message = `User Action: "${action.name}" initiated.`;
-     if (selectedDocsCount > 0) { message += ` Processing with ${selectedDocsCount} selected document(s).`; }
-     else { message += ` No documents selected.`; }
-    chatMessages.value.push({ id: `userAction${Date.now()}`, text: message, isUser: false, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
-    scrollToBottom();
 };
 
 const updateHighlightedDocumentsBySubject = (subject) => {
@@ -429,75 +582,135 @@ const updateHighlightedDocumentsBySubject = (subject) => {
     const newHighlightedIds = [];
     allProjectDocuments.value.forEach(doc => { if (doc.subjects?.includes(subject) || doc.keyPlayers?.includes(subject) || doc.name.toLowerCase().includes(subject.toLowerCase())) { newHighlightedIds.push(doc.id); } });
     highlightedDocumentIds.value = newHighlightedIds;
-    chatMessages.value.push({ id: `highlight${Date.now()}`, text: `Highlighted ${newHighlightedIds.length} document(s) for "${subject}".`, isUser: false, time: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) });
-    scrollToBottom();
+    addAssistantMessage(`Highlighted ${newHighlightedIds.length} document(s) for "${subject}".`);
 };
 
 const showAnalytics = () => { alert("Analytics feature coming soon!"); };
 const shareProject = () => { alert("Sharing options coming soon!"); };
 const toggleUserMenu = () => { alert("User menu coming soon!"); };
 
+const startAssistantConversation = async (payload) => {
+    let initialText = "Okay, let's try that.";
+
+    // Use the fetched persona/tangent data for initial text
+    if (payload.persona_id) {
+        const persona = personas.value.find(p => p.id === payload.persona_id);
+        if (persona) initialText = persona.promptStart;
+    }
+    if (payload.tangent_id) {
+        const tangent = tangents.value.find(t => t.id === payload.tangent_id);
+        if (tangent) initialText = tangent.promptStart;
+    }
+    if (payload.custom_deep_dive) initialText = `Starting a deep dive on: "${payload.custom_deep_dive}".`;
+
+    addAssistantMessage(initialText);
+
+    try {
+        const response = await fetch(`${API_BASE_URL}/api/projects/${projectId.value}/chat`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ message: initialText, selected_doc_ids: Object.values(selectedDocumentsPerStream.value).flat(), ...payload })
+        });
+        if (!response.ok) throw new Error(`API Error: ${response.status}`);
+        const data = await response.json();
+        addAssistantMessage(data.response_text);
+    } catch (error) {
+        console.error("Failed to start assistant conversation:", error);
+        addAssistantMessage("Sorry, I couldn't process that request.", true);
+    }
+};
+
 const selectPersona = (persona) => {
     selectedPersona.value = selectedPersona.value?.id === persona.id ? null : persona;
-    if (selectedPersona.value) { sendChatMessage('system', `${persona.promptStart}What would you like to discuss?`); }
+    if (selectedPersona.value) {
+        startAssistantConversation({ persona_id: persona.id });
+    }
 };
 
 const selectTangent = (tangent) => {
     selectedTangent.value = selectedTangent.value?.id === tangent.id ? null : tangent;
-     if (selectedTangent.value) { sendChatMessage('system', `${tangent.promptStart}`); }
+     if (selectedTangent.value) {
+        startAssistantConversation({ tangent_id: tangent.id });
+     }
 };
 
 const startCustomDeepDive = () => {
     if (customDeepDiveInput.value.trim()) {
-        sendChatMessage('system', `Starting a custom deep dive on: "${customDeepDiveInput.value.trim()}". What are your initial thoughts or questions?`);
+        startAssistantConversation({ custom_deep_dive: customDeepDiveInput.value.trim() });
         customDeepDiveInput.value = '';
     } else { alert("Please enter a topic for your custom deep dive."); }
 };
 
-const addNoteAsDocument = () => {
+const addNoteAsDocument = async () => {
     if (!currentNoteContent.value.trim()) {
         alert("Note is empty. Please write something before adding.");
         return;
     }
-    let notesStream = researchStreams.value.find(s => s.name === 'My Notes');
-    if (!notesStream) {
-        notesStream = {
-            id: `stream-notes-${Date.now()}`,
-            name: 'My Notes',
-            documents: []
-        };
-        researchStreams.value.push(notesStream);
-        expandedStreams.value[notesStream.id] = true; // Ensure it's expandable
-        if (!selectedDocumentsPerStream.value[notesStream.id]) { // Initialize if not present
-             selectedDocumentsPerStream.value[notesStream.id] = [];
+
+    try {
+        let notesStream = researchStreams.value.find(s => s.subject === 'My Notes');
+        let streamId;
+
+        if (!notesStream) {
+            console.log("Creating a 'My Notes' stream...");
+            const streamResponse = await fetch(`${API_BASE_URL}/api/projects/${projectId.value}/streams`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    subject: 'My Notes',
+                    focus: 'User-generated notes and annotations',
+                    analysisType: 'General'
+                })
+            });
+            if (!streamResponse.ok) throw new Error('Failed to create notes stream');
+            const newStream = await streamResponse.json();
+            streamId = newStream.id;
+        } else {
+            streamId = notesStream.id;
         }
-        console.log("Created a default 'My Notes' stream.");
+
+        const newNoteDocPayload = {
+            name: `Note - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
+            type: 'note',
+            content: currentNoteContent.value,
+            subjects: ['User Note'],
+        };
+
+        const docResponse = await fetch(`${API_BASE_URL}/api/projects/${projectId.value}/streams/${streamId}/documents`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(newNoteDocPayload)
+        });
+
+        if (!docResponse.ok) throw new Error('Failed to add note as document');
+        const createdDocument = await docResponse.json();
+
+        currentNoteContent.value = '';
+        alert(`Note added as a document to "My Notes" stream.`);
+        addAssistantMessage(`A new note titled "${createdDocument.name}" has been added as a document.`);
+        activeLeftPanelTab.value = 'streams';
+
+        await loadProjectData();
+
+    } catch (error) {
+        console.error("Error adding note as document:", error);
+        alert("There was an error saving your note. Please try again.");
     }
-
-    const newNoteDoc = {
-        id: `note-${Date.now()}`,
-        name: `Note - ${new Date().toLocaleDateString()} ${new Date().toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
-        type: 'note',
-        publicationDate: new Date().toISOString().split('T')[0],
-        content: currentNoteContent.value,
-        subjects: ['User Note'],
-        keyPlayers: [],
-    };
-
-    notesStream.documents.push(newNoteDoc); // Add to the 'My Notes' stream
-
-    currentNoteContent.value = '';
-    alert(`Note added as a document to stream: "${notesStream.name}"`);
-    sendChatMessage('system', `A new note titled "${newNoteDoc.name}" has been added as a document.`);
-    activeLeftPanelTab.value = 'streams';
 };
+
+const unfilteredAllProjectDocuments = computed(() => {
+  return researchStreams.value.reduce((acc, stream) => {
+    return acc.concat(stream.documents.map(doc => ({...doc, streamName: stream.subject, streamId: stream.id })));
+  }, []);
+});
+
 
 // --- Watchers ---
 watch(
-  () => [route.params.projectId, route.params.projectName],
+  () => [route.params.projectId, route.params.projectName, route.query.focusStream],
   ([newPid, newPname]) => {
     if (newPid && newPname) {
-      if (newPid !== projectId.value || newPname !== projectName.value || !researchStreams.value.length) {
+      if (newPid !== projectId.value || !researchStreams.value.length) {
         projectId.value = newPid;
         projectName.value = newPname;
         loadProjectData();
@@ -509,6 +722,13 @@ watch(
   { immediate: true }
 );
 
+// Watcher to clear selectedDocumentForHierarchy when switching away from documents tab
+watch(activeCenterPanelTab, (newTab) => {
+  if (newTab !== 'documents') {
+    selectedDocumentForHierarchy.value = null;
+  }
+});
+
 watch(isRightPanelEffectivelyVisible, (newValue, oldValue) => {
     if (newValue !== oldValue) {
         const currentRightWidth = newValue ? rightPanelWidthPercent.value : 0;
@@ -516,6 +736,18 @@ watch(isRightPanelEffectivelyVisible, (newValue, oldValue) => {
             leftPanelWidthPercent.value = Math.max(minPanelPercent, 100 - minPanelPercent - currentRightWidth);
         }
     }
+});
+
+onMounted(() => {
+  checkRightPanelVisibility();
+  window.addEventListener('resize', checkRightPanelVisibility);
+  loadStaticData(); // Load dynamic configuration data on mount
+});
+
+onBeforeUnmount(() => {
+  window.removeEventListener('resize', checkRightPanelVisibility);
+  window.removeEventListener('mousemove', handleDrag);
+  window.removeEventListener('mouseup', stopDrag);
 });
 
 </script>
