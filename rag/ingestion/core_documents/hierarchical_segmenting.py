@@ -3,6 +3,8 @@
 ## This will be developed for CRS reports and then split into CRS report specific and this general
 ## Document segmentation strategy.
 
+from collections import Counter
+from bs4 import BeautifulSoup
 
 def convert_to_markdown(element):
     text = ''
@@ -100,16 +102,6 @@ def parse_html_content(html_string):
 
 ## Initial Chunker -> about a 50% loss
 def count_words_in_chunk(chunk):
-    """
-    Calculates the total number of words in a chunk of content.
-    A chunk is a list of dictionaries, where each dictionary has a 'content' key.
-
-    Args:
-        chunk (list): A list of content items (dictionaries).
-
-    Returns:
-        int: The total word count in the chunk.
-    """
     count = 0
     for item in chunk:
         # Split content by whitespace to count words
@@ -121,9 +113,6 @@ def count_words_in_chunk(chunk):
 # you would import this function or run the scripts sequentially.
 
 def hierarchical_chunker_recursive(current_chunk, level, max_words, buffer):
-    """
-    Recursively splits a chunk of a document into smaller chunks based on headings.
-    """
     final_chunks = []
     heading_tag = f'heading_{level}'
     has_headings_at_this_level = any(item['type'] == heading_tag for item in current_chunk)
@@ -173,10 +162,7 @@ def hierarchical_chunker_recursive(current_chunk, level, max_words, buffer):
     return final_chunks
 
 def chunk_document(data, max_words, buffer, target_level=1):
-    """
-    Main function to start the hierarchical chunking process.
-    """
-    return hierarchical_chunker_recursive(data, 3, max_words, buffer)
+    return hierarchical_chunker_recursive(data, target_level, max_words, buffer)
 
 
 # --- Chunk Merging Logic ---
@@ -278,23 +264,6 @@ def skip_heading_1(passages, min_necessary=1):
 
 ### Simple Chunker
 
-def count_words_in_chunk(chunk):
-    """
-    Calculates the total number of words in a chunk of content.
-    A chunk is a list of dictionaries, where each dictionary has a 'content' key.
-
-    Args:
-        chunk (list): A list of content items (dictionaries).
-
-    Returns:
-        int: The total word count in the chunk.
-    """
-    count = 0
-    for item in chunk:
-        # Split content by whitespace to count words
-        count += len(item.get('content', '').split())
-    return count
-
 def simple_chunker(data, target_word_count):
     """
     Chunks a document by greedily adding passages until a target word count is reached.
@@ -334,31 +303,6 @@ def simple_chunker(data, target_word_count):
         chunks.append(current_chunk)
 
     return chunks
-
-def add_citations(chunks, base_citation):
-    """
-    Adds a unique citation and preserves the original document index for each passage.
-
-    Args:
-        chunks (list): A list of chunks.
-        base_citation (str): The base string to use for citations.
-
-    Returns:
-        list: The list of chunks with citations added to each passage.
-    """
-    cited_chunks = []
-    # Enumerate from 1 to get human-readable chunk IDs
-    for chunk_id, chunk in enumerate(chunks, 1):
-        new_chunk = []
-        # Enumerate from 1 for passage IDs within the chunk
-        for passage_id, passage in enumerate(chunk, 1):
-            # Create a copy to preserve all existing fields, including 'doc_index'.
-            new_passage = passage.copy()
-            new_passage['citation'] = f"{base_citation}_{chunk_id}__{passage_id}"
-            new_chunk.append(new_passage)
-        cited_chunks.append(new_chunk)
-    return cited_chunks
-
 
 
 def parse_report_metadata(metadata):
