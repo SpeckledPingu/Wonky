@@ -22,18 +22,22 @@ def process_identified_insights(identified_insights: str,
                                 search_document: SearchDocument,
                                 citation_prefix: str = "INST_",
                                 citation_hash_length: int = 6) -> List[Insight]:
-
-    identified_insights_json = convert_response_to_json(identified_insights)
-    insights = list()
-    for _insight in identified_insights_json:
-        _insight['run_id'] = search_document.run_id
-        _insight['result_id'] = search_document.result_id
-        _insight['citation'] = create_citation(_insight,
-                                              fields=['insight_type','insight_name','insight_synopsis'],
-                                              prefix=citation_prefix,
-                                              number_of_digits=citation_hash_length
-                                               )
-        insights.append(Insight(**_insight))
+    try:
+        identified_insights_json = convert_response_to_json(identified_insights)
+        insights = list()
+        for _insight in identified_insights_json:
+            _insight['run_id'] = search_document.run_id
+            _insight['result_id'] = search_document.result_id
+            _insight['citation'] = create_citation(_insight,
+                                                  fields=['insight_type','insight_name','insight_synopsis'],
+                                                  prefix=citation_prefix,
+                                                  number_of_digits=citation_hash_length
+                                                   )
+            insights.append(Insight(**_insight))
+    except Exception as e:
+        print(search_document.run_id, search_document.chunk_id, search_document.result_id)
+        print(identified_insights)
+        return []
     return insights
 
 def identify_insights(search_document: SearchDocument,
