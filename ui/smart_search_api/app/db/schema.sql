@@ -1,10 +1,9 @@
 -- =================================================================
---  SCHEMA SCRIPT for Research Analytics Platform (v3 - Multi-Project)
---  Database: SQLite
---  Description: Creates all tables based on the final SQLAlchemy models.
+--  SCHEMA SCRIPT for Research Analytics Platform (v3.4 - With Saved Results)
 -- =================================================================
 
 -- Drop tables in reverse order of creation to respect foreign key constraints
+DROP TABLE IF EXISTS saved_search_results;
 DROP TABLE IF EXISTS processing_bucket_items;
 DROP TABLE IF EXISTS report_sources;
 DROP TABLE IF EXISTS document_tags;
@@ -22,6 +21,7 @@ CREATE TABLE users (
   id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
   username TEXT NOT NULL,
   email TEXT NOT NULL,
+  hashed_password TEXT NOT NULL,
   created_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
   UNIQUE (username),
   UNIQUE (email)
@@ -36,6 +36,7 @@ CREATE INDEX ix_users_email ON users (email);
 CREATE TABLE projects (
   id INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
   name TEXT NOT NULL,
+  description TEXT,
   user_id INTEGER NOT NULL,
   created_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
   FOREIGN KEY(user_id) REFERENCES users (id)
@@ -125,6 +126,18 @@ CREATE TABLE processing_bucket_items (
   project_id INTEGER NOT NULL,
   document_id TEXT NOT NULL,
   added_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
+  PRIMARY KEY (project_id, document_id),
+  FOREIGN KEY(project_id) REFERENCES projects (id),
+  FOREIGN KEY(document_id) REFERENCES documents (id)
+);
+
+-- -----------------------------------------------------
+-- Table `saved_search_results` (New Table)
+-- -----------------------------------------------------
+CREATE TABLE saved_search_results (
+  project_id INTEGER NOT NULL,
+  document_id TEXT NOT NULL,
+  saved_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
   PRIMARY KEY (project_id, document_id),
   FOREIGN KEY(project_id) REFERENCES projects (id),
   FOREIGN KEY(document_id) REFERENCES documents (id)

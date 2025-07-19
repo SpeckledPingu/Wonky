@@ -41,11 +41,14 @@
 <script setup>
 import { useSearchStore } from '../../stores/searchStore';
 import { useDocumentStore } from '../../stores/documentStore';
+import { useProjectStore } from '../../stores/projectStore'; // <-- IMPORTED
 
 const searchStore = useSearchStore();
 const documentStore = useDocumentStore();
+const projectStore = useProjectStore(); // <-- INITIALIZED
 
 const viewDocument = (docId) => {
-  documentStore.viewDocument(docId);
+  // --- FIX: Pass the activeProjectId to the viewDocument action ---
+  documentStore.viewDocument(projectStore.activeProjectId, docId);
 };
 </script>

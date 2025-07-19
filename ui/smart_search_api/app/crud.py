@@ -2,22 +2,67 @@ from sqlalchemy.orm import Session
 from sqlalchemy import or_
 from sqlalchemy.dialects.sqlite import insert
 from app import models, schemas
+from app.core import security
 import uuid
 import datetime
 
+
+
+def create_project(db: Session, project: schemas.ProjectCreate, user_id: int):
+    """
+    Creates a new project for a user.
+    """
+    db_project = models.Project(**project.model_dump(), user_id=user_id)
+    db.add(db_project)
+    db.commit()
+    db.refresh(db_project)
+    return db_project
 
 def get_projects_by_user(db: Session, user_id: int):
     """
     Retrieves all projects owned by a specific user.
     """
-    print(user_id)
+    return db.query(models.Project).filter(models.Project.user_id == user_id).all()
+
+
+# --- User and Auth Functions ---
+def get_user_by_email(db: Session, email: str):
+    return db.query(models.User).filter(models.User.email == email).first()
+
+
+def create_user(db: Session, user: schemas.UserCreate):
+    hashed_password = security.get_password_hash(user.password)
+    db_user = models.User(email=user.email, username=user.username, hashed_password=hashed_password)
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    return db_user
+
+
+def authenticate_user(db: Session, email: str, password: str):
+    user = get_user_by_email(db, email)
+    if not user or not security.verify_password(password, user.hashed_password):
+        return None
+    return user
+
+
+def get_projects_by_user(db: Session, user_id: int):
     return db.query(models.Project).filter(models.Project.user_id == user_id).all()
 
 
 # === Document & Search CRUD ===
-def get_document(db: Session, doc_id: str, project_id: int):
-    return db.query(models.Document).filter(models.Document.id == doc_id,
-                                            models.Document.project_id == project_id).first()
+def get_document(db: Session, doc_id: str, project_id: int, user_id: int):
+    """
+    Fetches a single document, ensuring it belongs to the specified project and user
+    by joining the projects table and checking the user_id.
+    """
+    return db.query(models.Document) \
+        .join(models.Project) \
+        .filter(
+        models.Document.id == doc_id,
+        models.Document.project_id == project_id,
+        models.Project.user_id == user_id
+    ).first()
 
 
 def search_documents(db: Session, project_id: int, query: str):
@@ -43,8 +88,9 @@ def search_extractions(db: Session, project_id: int, query: schemas.ExtractionSe
     return db_query.all()
 
 
-def update_document(db: Session, doc_id: str, project_id: int, doc_update: schemas.DocumentUpdateRequest):
-    db_doc = get_document(db, doc_id, project_id)
+def update_document(db: Session, doc_id: str, project_id: int, user_id: int, doc_update: schemas.DocumentUpdateRequest):
+    # Use the secure get_document function to verify ownership before updating
+    db_doc = get_document(db, doc_id=doc_id, project_id=project_id, user_id=user_id)
     if not db_doc:
         return None
     
@@ -60,8 +106,17 @@ def update_document(db: Session, doc_id: str, project_id: int, doc_update: schem
 
 
 # === Report CRUD ===
-def get_report(db: Session, report_id: str, project_id: int):
-    return db.query(models.Report).filter(models.Report.id == report_id, models.Report.project_id == project_id).first()
+def get_report(db: Session, report_id: str, project_id: int, user_id: int):
+    """
+    Fetches a single report, ensuring it belongs to the specified project and user.
+    """
+    return db.query(models.Report) \
+        .join(models.Project) \
+        .filter(
+        models.Report.id == report_id,
+        models.Report.project_id == project_id,
+        models.Project.user_id == user_id
+    ).first()
 
 
 def get_reports_by_project(db: Session, project_id: int):
@@ -106,5 +161,41 @@ def remove_from_bucket(db: Session, doc_ids: list[str], project_id: int):
     db.query(models.ProcessingBucketItem).filter(
         models.ProcessingBucketItem.project_id == project_id,
         models.ProcessingBucketItem.document_id.in_(doc_ids)
+    ).delete(synchronize_session=False)
+    db.commit()
+
+def get_saved_results(db: Session, project_id: int):
+    """
+    Retrieves all saved search result documents for a specific project.
+    """
+    print(project_id)
+    return db.query(models.Document)\
+        .join(models.SavedSearchResult, models.SavedSearchResult.document_id == models.Document.id)\
+        .filter(models.SavedSearchResult.project_id == project_id)\
+        .order_by(models.SavedSearchResult.saved_at.desc())\
+        .all()
+
+def add_saved_result(db: Session, doc_id: str, project_id: int):
+    """
+    Adds a document to the saved results list for a project, ignoring duplicates.
+    """
+    stmt = insert(models.SavedSearchResult).values(
+        project_id=project_id,
+        document_id=doc_id
+    )
+    stmt = stmt.on_conflict_do_nothing(
+        index_elements=['project_id', 'document_id']
+    )
+    db.execute(stmt)
+    db.commit()
+    return {"status": "success"}
+
+def remove_saved_result(db: Session, doc_id: str, project_id: int):
+    """
+    Removes a document from the saved results list for a project.
+    """
+    db.query(models.SavedSearchResult).filter(
+        models.SavedSearchResult.project_id == project_id,
+        models.SavedSearchResult.document_id == doc_id
     ).delete(synchronize_session=False)
     db.commit()

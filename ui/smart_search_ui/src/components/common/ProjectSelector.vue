@@ -33,6 +33,7 @@ import { useProjectStore } from '../../stores/projectStore';
 const projectStore = useProjectStore();
 
 const handleProjectChange = (newProjectId) => {
+    // --- FIX: This now just updates the store, no reload needed ---
     projectStore.setActiveProject(Number(newProjectId));
 };
 </script>

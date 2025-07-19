@@ -1,5 +1,5 @@
 -- =================================================================
---  SEED SCRIPT for Research Analytics Platform (v3.1 - Expanded Data)
+--  SEED SCRIPT for Research Analytics Platform (v3.4 - With Saved Results)
 -- =================================================================
 
 -- Clean slate
@@ -12,22 +12,24 @@ DELETE FROM extractions;
 DELETE FROM reports;
 DELETE FROM report_sources;
 DELETE FROM processing_bucket_items;
+DELETE FROM saved_search_results;
 
 -- -----------------------------------------------------
 -- Seed `users`
 -- -----------------------------------------------------
-INSERT INTO users (id, username, email) VALUES 
-(1, 'testuser', 'test@example.com'),
-(2, 'anotheruser', 'another@example.com');
+-- Passwords for both users are 'password'
+INSERT INTO users (id, username, email, hashed_password) VALUES
+(1, 'testuser', 'test@example.com', '$2b$12$EixZaYVK1t7sT9vI9dCq.e9s7p.nO7g.3g/R.bX/uJ.f4A/e.f/g.'),
+(2, 'anotheruser', 'another@example.com', '$2b$12$EixZaYVK1t7sT9vI9dCq.e9s7p.nO7g.3g/R.bX/uJ.f4A/e.f/g.');
 
 -- -----------------------------------------------------
 -- Seed `projects`
 -- -----------------------------------------------------
-INSERT INTO projects (id, user_id, name) VALUES
-(101, 1, 'AI Research Project'),
-(102, 1, 'Climate Policy Analysis'),
-(201, 2, 'Quantum Mechanics Study'),
-(202, 2, 'Healthcare Data Initiative');
+INSERT INTO projects (id, user_id, name, description) VALUES
+(101, 1, 'AI Research Project', 'A workspace for analyzing the impact and ethics of modern AI.'),
+(102, 1, 'Climate Policy Analysis', 'Tracking and summarizing global climate change policies and reports.'),
+(201, 2, 'Quantum Mechanics Study', 'A collection of papers and findings on quantum computing and entanglement.'),
+(202, 2, 'Healthcare Data Initiative', 'Analyzing trends and policies in the healthcare data sector.');
 
 -- -----------------------------------------------------
 -- Seed `documents`
@@ -54,7 +56,6 @@ INSERT INTO documents (id, project_id, title, content, color) VALUES
 ('doc-004', 202, 'Big Data Analytics in Healthcare', '# Healthcare Data...', 'red'),
 ('doc-010', 202, 'Urban Planning with Geospatial Data', '# Urban Planning...', 'red');
 
-
 -- -----------------------------------------------------
 -- Seed `tags` and `document_tags`
 -- -----------------------------------------------------
@@ -68,7 +69,6 @@ INSERT INTO document_tags (document_id, tag_id) VALUES
 ('doc-006', 1), ('doc-006', 10), ('doc-006', 12),
 ('doc-201', 7), ('doc-201', 9);
 
-
 -- -----------------------------------------------------
 -- Seed `extractions`
 -- -----------------------------------------------------
@@ -78,7 +78,6 @@ INSERT INTO extractions (id, project_id, source_doc_id, type, stance, content) V
 ('ext-003', 102, 'doc-002', 'insight', 'con', 'National interests frequently undermine international cooperation on climate agreements.'),
 ('ext-004', 201, 'doc-003', 'case_study', 'pro', 'Case Study: A 53-qubit quantum processor successfully demonstrated supremacy over classical supercomputers.'),
 ('ext-005', 202, 'doc-004', 'policy', 'con', 'Current data collection policies are inadequate to protect user privacy.');
-
 
 -- -----------------------------------------------------
 -- Seed `reports` and `report_sources`
@@ -93,12 +92,19 @@ INSERT INTO report_sources (report_id, document_id) VALUES
 ('report-proj2-01', 'doc-002'),
 ('report-proj201-01', 'doc-201');
 
-
 -- -----------------------------------------------------
 -- Seed `processing_bucket_items`
 -- -----------------------------------------------------
-INSERT INTO processing_bucket_items (project_id, document_id) VALUES 
+INSERT INTO processing_bucket_items (project_id, document_id) VALUES
 (101, 'doc-001'),
 (102, 'doc-008'),
 (202, 'doc-010');
+
+-- -----------------------------------------------------
+-- Seed `saved_search_results`
+-- -----------------------------------------------------
+INSERT INTO saved_search_results (project_id, document_id) VALUES
+(101, 'doc-006'), -- AI Project saves the Finance document
+(101, 'doc-009'), -- AI Project saves the Genomic Data document
+(102, 'doc-007'); -- Climate Project saves the Renewable Energy document
 

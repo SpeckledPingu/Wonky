@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { marked } from 'marked';
 import { documentService } from '../services/api';
 import { useNotificationStore } from './notificationStore';
@@ -8,7 +8,7 @@ import { useProjectStore } from './projectStore';
 export const useDocumentStore = defineStore('documents', () => {
   // State
   const activeDocumentId = ref(null);
-  const documentsCache = ref({}); // Cache for all fetched documents
+  const documentsCache = ref({});
   const isLoading = ref(false);
 
   // Getters
@@ -45,6 +45,18 @@ export const useDocumentStore = defineStore('documents', () => {
     }
   }
 
+  // --- NEW FUNCTION ---
+  function clearState() {
+      activeDocumentId.value = null;
+      documentsCache.value = {};
+      isLoading.value = false;
+  }
+
+  const projectStore = useProjectStore();
+  watch(() => projectStore.activeProjectId, () => {
+      clearState(); // Clear document state when project changes
+  });
+
   return {
     activeDocumentId,
     documentsCache,
@@ -53,5 +65,6 @@ export const useDocumentStore = defineStore('documents', () => {
     activeDocumentHtml,
     viewDocument,
     upsertDocument,
+    clearState,
   };
 });

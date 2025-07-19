@@ -1,7 +1,8 @@
 import { defineStore } from 'pinia';
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { searchService } from '../services/api';
 import { useNotificationStore } from './notificationStore';
+import { useProjectStore } from './projectStore';
 
 export const useSearchStore = defineStore('search', () => {
     // State
@@ -78,6 +79,10 @@ export const useSearchStore = defineStore('search', () => {
             attempts++;
         }, 1500); // Poll every 1.5 seconds
     }
+    const projectStore = useProjectStore();
+        watch(() => projectStore.activeProjectId, () => {
+            clearSearchState();
+        });
 
     return {
         guidingPrompt,

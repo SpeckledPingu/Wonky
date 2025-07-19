@@ -1,32 +1,25 @@
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from app import schemas, crud
+from app import schemas, crud, models
 from app.database import get_db
+from app.core.security import get_current_user
 
 router = APIRouter()
 
 
 @router.get("/projects/{project_id}/documents/{doc_id}", response_model=schemas.Document)
-def get_document_by_id(project_id: int, doc_id: str, db: Session = Depends(get_db)):
-    """
-    Fetches a single document or report by its ID from the database, scoped to a project.
-    """
-    # First, check if the ID corresponds to a regular document
-    db_doc = crud.get_document(db, doc_id=doc_id, project_id=project_id)
+def get_document_by_id(project_id: int, doc_id: str, db: Session = Depends(get_db),
+                       current_user: models.User = Depends(get_current_user)):
+    db_doc = crud.get_document(db, doc_id=doc_id, project_id=project_id, user_id=current_user.id)
     if db_doc:
         return db_doc
     
-    # If not found, check if it corresponds to a report in the same project
-    db_report = crud.get_report(db, report_id=doc_id, project_id=project_id)
+    db_report = crud.get_report(db, report_id=doc_id, project_id=project_id, user_id=current_user.id)
     if db_report:
-        # --- FIX ---
-        # When a report is found, we must correctly construct a `schemas.Document`
-        # object using keyword arguments to satisfy the Pydantic model.
         report_tags = [
             schemas.Tag(id=-1, name='report'),
             schemas.Tag(id=-2, name=db_report.analysis_type)
         ]
-        
         return schemas.Document(
             id=db_report.id,
             title=db_report.title,
@@ -35,17 +28,14 @@ def get_document_by_id(project_id: int, doc_id: str, db: Session = Depends(get_d
             color='purple'
         )
     
-    # If the ID is not found in either, raise a 404 error
-    raise HTTPException(status_code=404, detail="Item not found in this project")
+    raise HTTPException(status_code=404, detail="Item not found in this project for the current user")
 
 
 @router.put("/projects/{project_id}/documents/{doc_id}", response_model=schemas.Document)
-def update_document(project_id: int, doc_id: str, doc_update: schemas.DocumentUpdateRequest,
-                    db: Session = Depends(get_db)):
-    """
-    Updates a document's tags and/or color in the database.
-    """
-    db_doc = crud.update_document(db, doc_id=doc_id, project_id=project_id, doc_update=doc_update)
+def update_document(project_id: int, doc_id: str, doc_update: schemas.DocumentUpdateRequest, db: Session = Depends(get_db),
+                    current_user: models.User = Depends(get_current_user)):
+    db_doc = crud.update_document(db, doc_id=doc_id, project_id=project_id, doc_update=doc_update,
+                                  user_id=current_user.id)
     if db_doc is None:
         raise HTTPException(status_code=404, detail="Document not found")
     return db_doc

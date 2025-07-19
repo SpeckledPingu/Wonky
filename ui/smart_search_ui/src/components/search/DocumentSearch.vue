@@ -50,13 +50,13 @@ import SearchResults from './SearchResults.vue';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { useSearchStore } from '../../stores/searchStore';
-import { useProjectStore } from '../../stores/projectStore'; // <-- IMPORTED
+import { useProjectStore } from '../../stores/projectStore';
 import { searchService } from '../../services/api';
 
 const documentStore = useDocumentStore();
 const notificationStore = useNotificationStore();
 const searchStore = useSearchStore();
-const projectStore = useProjectStore(); // <-- INITIALIZED
+const projectStore = useProjectStore();
 
 const searchQuery = ref('data');
 const searchMode = ref('semantic');
@@ -76,7 +76,6 @@ async function performSearch() {
   isLoading.value = true;
   searchResults.value = [];
   try {
-    // --- FIX: Added projectId as the first argument to the API call ---
     const response = await searchService.searchDocuments(
         projectId,
         searchQuery.value,
@@ -99,6 +98,7 @@ async function performSearch() {
 };
 
 const handleResultClick = (docId) => {
+  // --- FIX: Pass the activeProjectId to the viewDocument action ---
   documentStore.viewDocument(projectStore.activeProjectId, docId);
 };
 </script>

@@ -20,14 +20,16 @@ class Project(Base):
     __tablename__ = "projects"
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String, nullable=False)
+    description = Column(Text, nullable=True) # <-- ADDED
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     owner = relationship("User", back_populates="projects")
     documents = relationship("Document", back_populates="project")
     reports = relationship("Report", back_populates="project")
     extractions = relationship("Extraction", back_populates="project")
     processing_bucket = relationship("ProcessingBucketItem", back_populates="project")
+    saved_results = relationship('SavedSearchResult', back_populates="project")
 
 
 class User(Base):
@@ -35,8 +37,9 @@ class User(Base):
     id = Column(Integer, primary_key=True, index=True)
     username = Column(String, unique=True, index=True, nullable=False)
     email = Column(String, unique=True, index=True, nullable=False)
+    hashed_password = Column(String, nullable=False) # <-- ADDED
     created_at = Column(DateTime(timezone=True), server_default=func.now())
-    
+
     projects = relationship("Project", back_populates="owner")
 
 
@@ -92,4 +95,13 @@ class ProcessingBucketItem(Base):
     added_at = Column(DateTime(timezone=True), server_default=func.now())
     
     project = relationship("Project", back_populates="processing_bucket")
+    document = relationship("Document")
+
+class SavedSearchResult(Base):
+    __tablename__ = "saved_search_results"
+    project_id = Column(Integer, ForeignKey("projects.id"), primary_key=True)
+    document_id = Column(String, ForeignKey("documents.id"), primary_key=True)
+    saved_at = Column(DateTime(timezone=True), server_default=func.now())
+
+    project = relationship("Project", back_populates="saved_results")
     document = relationship("Document")

@@ -11,7 +11,6 @@ export const useProcessingStore = defineStore('processing', () => {
 
     // Actions
     async function fetchBucket(projectId) {
-        // --- FIX: Prevent running if projectId is null/undefined ---
         if (!projectId) {
             processingQueue.value = [];
             return;
@@ -60,7 +59,7 @@ export const useProcessingStore = defineStore('processing', () => {
         const notificationStore = useNotificationStore();
         const projectId = projectStore.activeProjectId;
 
-        if (!projectId || !docIds || docIds.length === 0) return;
+        if (!projectId || !docIds || !docIds.length) return;
 
         try {
             const response = await processingService.removeFromBucket(projectId, docIds);
@@ -72,16 +71,17 @@ export const useProcessingStore = defineStore('processing', () => {
         }
     }
 
+    // --- NEW FUNCTION ---
+    function clearState() {
+        processingQueue.value = [];
+    }
+
     const projectStore = useProjectStore();
     watch(() => projectStore.activeProjectId, (newProjectId) => {
-        // --- FIX: Add a guard clause ---
-        // This ensures the fetch only runs when a valid project ID is set.
         if (newProjectId) {
-            console.log(`Project changed to ${newProjectId}, fetching bucket...`);
             fetchBucket(newProjectId);
         } else {
-            // If there's no active project, clear the bucket.
-            processingQueue.value = [];
+            clearState(); // Use the new clear function
         }
     }, { immediate: true });
 
@@ -90,5 +90,6 @@ export const useProcessingStore = defineStore('processing', () => {
         fetchBucket,
         addToQueue,
         removeItemsFromQueue,
+        clearState, // Expose the new function
     };
 });

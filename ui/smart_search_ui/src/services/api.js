@@ -1,16 +1,12 @@
-import { useUserStore } from '../stores/userStore';
+import { useAuthStore } from '../stores/authStore';
 import { useNotificationStore } from '../stores/notificationStore';
-import { useProjectStore } from '../stores/projectStore';
 
 const API_BASE_URL = 'http://127.0.0.1:8000/api/v1';
 
-// --- FIX: This is the core API function that was missing ---
 async function apiRequest(endpoint, options = {}) {
-    const userStore = useUserStore();
     const notificationStore = useNotificationStore();
     const headers = {
         'Content-Type': 'application/json',
-        'Authorization': `Bearer ${userStore.userId || 'mock-token'}`,
         ...options.headers,
     };
 
@@ -34,46 +30,93 @@ async function apiRequest(endpoint, options = {}) {
     }
 }
 
+async function authRequest(endpoint, options = {}) {
+    const authStore = useAuthStore();
+    if (!authStore.token) {
+        throw new Error("Authentication token not found.");
+    }
+
+    const headers = {
+        ...options.headers,
+        'Authorization': `Bearer ${authStore.token}`,
+    };
+
+    return apiRequest(endpoint, { ...options, headers });
+}
+
+export const authService = {
+    login: (email, password) => {
+        const formData = new URLSearchParams();
+        formData.append('username', email);
+        formData.append('password', password);
+
+        return apiRequest('/users/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: formData,
+        });
+    },
+    register: (username, email, password) => apiRequest('/users/register', {
+        method: 'POST',
+        body: JSON.stringify({ username, email, password }),
+    }),
+};
+
 export const projectService = {
-    getProjects: () => apiRequest('/projects'),
+    getProjects: () => authRequest('/projects'),
+    createProject: (projectData) => authRequest('/projects', {
+        method: 'POST',
+        body: JSON.stringify(projectData),
+    }),
+};
+
+// --- NEW SERVICE ---
+export const savedResultsService = {
+    getSavedResults: (projectId) => authRequest(`/projects/${projectId}/saved-results`),
+    saveResult: (projectId, docId) => authRequest(`/projects/${projectId}/saved-results/${docId}`, {
+        method: 'POST',
+    }),
+    removeResult: (projectId, docId) => authRequest(`/projects/${projectId}/saved-results/${docId}`, {
+        method: 'DELETE',
+    }),
 };
 
 export const documentService = {
-    getDocumentById: (projectId, docId) => apiRequest(`/projects/${projectId}/documents/${docId}`),
-    updateDocument: (projectId, docId, updates) => apiRequest(`/projects/${projectId}/documents/${docId}`, {
+    getDocumentById: (projectId, docId) => authRequest(`/projects/${projectId}/documents/${docId}`),
+    updateDocument: (projectId, docId, updates) => authRequest(`/projects/${projectId}/documents/${docId}`, {
         method: 'PUT',
         body: JSON.stringify(updates),
     }),
 };
 
 export const searchService = {
-    searchDocuments: (projectId, query, mode, guidingPrompt) => apiRequest(`/projects/${projectId}/search/documents`, {
+    searchDocuments: (projectId, query, mode, guidingPrompt) => authRequest(`/projects/${projectId}/search/documents`, {
         method: 'POST',
         body: JSON.stringify({ query, mode, guidingPrompt }),
     }),
-    searchExtractions: (projectId, query, contentTypes, stances, guidingPrompt) => apiRequest(`/projects/${projectId}/search/extractions`, {
+    searchExtractions: (projectId, query, contentTypes, stances, guidingPrompt) => authRequest(`/projects/${projectId}/search/extractions`, {
         method: 'POST',
         body: JSON.stringify({ query, contentTypes, stances, guidingPrompt }),
     }),
-    getSummaryUpdate: (searchId) => apiRequest(`/search/summary/updates/${searchId}`),
+    getSummaryUpdate: (searchId) => authRequest(`/search/summary/updates/${searchId}`),
 };
 
 export const processingService = {
-    getBucket: (projectId) => apiRequest(`/projects/${projectId}/processing/bucket`),
-    addToBucket: (projectId, documentId) => apiRequest(`/projects/${projectId}/processing/bucket`, {
+    getBucket: (projectId) => authRequest(`/projects/${projectId}/processing/bucket`),
+    addToBucket: (projectId, documentId) => authRequest(`/projects/${projectId}/processing/bucket`, {
         method: 'POST',
         body: JSON.stringify({ documentId }),
     }),
-    removeFromBucket: (projectId, documentIds) => apiRequest(`/projects/${projectId}/processing/bucket`, {
+    removeFromBucket: (projectId, documentIds) => authRequest(`/projects/${projectId}/processing/bucket`, {
         method: 'DELETE',
         body: JSON.stringify({ documentIds }),
     }),
-    submitJob: (projectId, jobDetails) => apiRequest(`/projects/${projectId}/processing/jobs`, {
+    submitJob: (projectId, jobDetails) => authRequest(`/projects/${projectId}/processing/jobs`, {
         method: 'POST',
         body: JSON.stringify(jobDetails),
     }),
 };
 
 export const reportsService = {
-    fetchReports: (projectId) => apiRequest(`/projects/${projectId}/reports`),
+    fetchReports: (projectId) => authRequest(`/projects/${projectId}/reports`),
 };

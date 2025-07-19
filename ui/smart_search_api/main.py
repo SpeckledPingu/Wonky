@@ -2,7 +2,7 @@ import uvicorn
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
-from app.api.v1 import search, processing, reports, documents, projects # <-- IMPORTED
+from app.api.v1 import search, processing, reports, documents, projects, auth, saved_results # <-- IMPORTED
 from app.core.config import settings
 from app.database import Base, engine
 
@@ -23,12 +23,14 @@ if settings.BACKEND_CORS_ORIGINS:
         allow_headers=["*"],
     )
 
-# Include the API routers
-app.include_router(projects.router, prefix=settings.API_V1_STR, tags=["Projects"]) # <-- ADDED
+# --- FIX: Include the auth router ---
+app.include_router(auth.router, prefix=settings.API_V1_STR, tags=["Authentication"])
+app.include_router(projects.router, prefix=settings.API_V1_STR, tags=["Projects"])
 app.include_router(search.router, prefix=settings.API_V1_STR, tags=["Search"])
 app.include_router(processing.router, prefix=settings.API_V1_STR, tags=["Processing"])
 app.include_router(reports.router, prefix=settings.API_V1_STR, tags=["Reports"])
 app.include_router(documents.router, prefix=settings.API_V1_STR, tags=["Documents"])
+app.include_router(saved_results.router, prefix=settings.API_V1_STR, tags=["Saved Results"])
 
 
 @app.get("/", tags=["Root"])

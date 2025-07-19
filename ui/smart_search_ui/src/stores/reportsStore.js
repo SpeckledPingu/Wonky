@@ -22,7 +22,6 @@ export const useReportsStore = defineStore('reports', () => {
 
     // Actions
     async function fetchReports(projectId) {
-        // --- FIX: Prevent running if projectId is null/undefined ---
         if (!projectId) {
             reports.value = [];
             return;
@@ -48,16 +47,18 @@ export const useReportsStore = defineStore('reports', () => {
         filterTerm.value = term;
     }
 
+    // --- NEW FUNCTION ---
+    function clearState() {
+        reports.value = [];
+        filterTerm.value = '';
+    }
+
     const projectStore = useProjectStore();
     watch(() => projectStore.activeProjectId, (newProjectId) => {
-        // --- FIX: Add a guard clause ---
-        // This ensures the fetch only runs when a valid project ID is set.
         if (newProjectId) {
-            console.log(`Project changed to ${newProjectId}, fetching reports...`);
             fetchReports(newProjectId);
         } else {
-            // If there's no active project, clear the reports list.
-            reports.value = [];
+            clearState(); // Use the new clear function
         }
     }, { immediate: true });
 
@@ -67,5 +68,6 @@ export const useReportsStore = defineStore('reports', () => {
         filteredReports,
         fetchReports,
         setFilter,
+        clearState, // Expose the new function
     };
 });

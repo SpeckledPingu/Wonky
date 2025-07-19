@@ -4,32 +4,31 @@ import random
 from typing import List
 from fastapi import APIRouter, HTTPException, Depends
 from sqlalchemy.orm import Session
-from app import schemas, crud
+from app import schemas, crud, models
 from app.database import get_db
+from app.core.security import get_current_user
 
 router = APIRouter()
 SUMMARY_JOBS = {}
-MOCK_USER_ID = 1
 
-# --- FIX: All endpoints are now project-specific ---
 @router.post("/projects/{project_id}/search/documents", response_model=schemas.SearchResponse)
-def search_documents(project_id: int, query: schemas.SearchQuery, db: Session = Depends(get_db)):
+def search_documents(project_id: int, query: schemas.SearchQuery, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Add verification
     results = crud.search_documents(db, project_id=project_id, query=query.query)
     search_id = f"search-doc-{uuid.uuid4()}"
     SUMMARY_JOBS[search_id] = { "results_to_summarize": [doc.id for doc in results], "summarized_ids": set(), "prompt": query.guidingPrompt }
     return schemas.SearchResponse(searchId=search_id, results=results)
 
 @router.post("/projects/{project_id}/search/extractions", response_model=schemas.ExtractionSearchResponse)
-def search_extractions(project_id: int, query: schemas.ExtractionSearchQuery, db: Session = Depends(get_db)):
+def search_extractions(project_id: int, query: schemas.ExtractionSearchQuery, db: Session = Depends(get_db), current_user: models.User = Depends(get_current_user)):
+    # Add verification
     results = crud.search_extractions(db, project_id=project_id, query=query)
     search_id = f"search-ext-{uuid.uuid4()}"
     SUMMARY_JOBS[search_id] = { "results_to_summarize": [ext.source_doc_id for ext in results], "summarized_ids": set(), "prompt": query.guidingPrompt }
     return schemas.ExtractionSearchResponse(searchId=search_id, results=results)
 
-# This endpoint remains global as it's job-ID specific
 @router.get("/search/summary/updates/{search_id}", response_model=schemas.SummaryUpdateResponse)
 def get_summary_update(search_id: str):
-    # ... (logic remains the same)
     if search_id not in SUMMARY_JOBS:
         raise HTTPException(status_code=404, detail="Search job not found.")
     job = SUMMARY_JOBS[search_id]
