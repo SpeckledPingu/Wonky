@@ -103,6 +103,7 @@ def extract_insights(insights: List[Insight],
         
         for insight in insights:
             if insight.citation in insight_extraction:
+                print(insight.insight_name)
                 insight.insight_data.append(insight_extraction[insight.citation])
                 insight.insight_text = format_insight_text(insight)
                 insert_insight(insight, conn)
