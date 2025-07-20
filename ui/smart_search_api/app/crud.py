@@ -5,7 +5,7 @@ from app import models, schemas
 from app.core import security
 import uuid
 import datetime
-
+from typing import List
 
 
 def create_project(db: Session, project: schemas.ProjectCreate, user_id: int):
@@ -168,12 +168,59 @@ def get_saved_results(db: Session, project_id: int):
     """
     Retrieves all saved search result documents for a specific project.
     """
-    print(project_id)
+    print("Get Saved Results Project ID:", project_id)
     return db.query(models.Document)\
         .join(models.SavedSearchResult, models.SavedSearchResult.document_id == models.Document.id)\
         .filter(models.SavedSearchResult.project_id == project_id)\
         .order_by(models.SavedSearchResult.saved_at.desc())\
         .all()
+
+
+def upsert_and_save_search_results(db: Session, results: List[schemas.RawSearchResult], project_id: int) -> List[
+    models.Document]:
+    """
+    Takes a list of raw search results, upserts them into the main documents table,
+    and saves them to the project's saved_search_results list.
+    This makes search results a persistent part of the user's project.
+    """
+    doc_ids = [result.id for result in results]
+    
+    for result in results:
+        # Step 1: Upsert the document into the global 'documents' table.
+        # This uses ON CONFLICT DO NOTHING, so if a document with this ID already
+        # exists, it won't be overwritten. This is crucial for preserving user edits.
+        doc_insert_stmt = insert(models.Document).values(
+            id=result.id,
+            title=result.title,
+            content=result.content,
+            project_id=project_id  # Note: This assumes the first project to import a doc "claims" it.
+        )
+        doc_conflict_stmt = doc_insert_stmt.on_conflict_do_nothing(index_elements=['id'])
+        db.execute(doc_conflict_stmt)
+        
+        # Step 2: Upsert the link in the 'saved_search_results' table.
+        # This connects the document to the current project.
+        saved_result_stmt = insert(models.SavedSearchResult).values(
+            project_id=project_id,
+            document_id=result.id
+        )
+        saved_conflict_stmt = saved_result_stmt.on_conflict_do_nothing(index_elements=['project_id', 'document_id'])
+        db.execute(saved_conflict_stmt)
+    
+    # Commit all the inserts at once.
+    db.commit()
+    
+    # Step 3: Fetch and return the full Document objects that are now saved for this project.
+    # This ensures the frontend gets the complete, database-consistent data.
+    saved_docs = db.query(models.Document).filter(
+        models.Document.id.in_(doc_ids),
+        models.Document.project_id == project_id
+    ).all()
+    print(doc_ids)
+    print(saved_docs)
+    
+    return saved_docs
+
 
 def add_saved_result(db: Session, doc_id: str, project_id: int):
     """
