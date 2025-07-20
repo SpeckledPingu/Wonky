@@ -80,13 +80,13 @@ def format_insight_text(insight):
 def extract_insights(insights: List[Insight],
                      search_document: SearchDocument,
                      prompt: str,
-                     conn: sqlite3.Connection,
                      batch_size: int = 5,
                      temperature: float = 0.2,
                      max_tokens: int = 10000) -> List[Insight]:
     
     insight_extraction_batches = create_batches([format_insight(_insight) for _insight in insights],
                                             batch_size=batch_size)
+    
     for batch in insight_extraction_batches:
         insight_text = '\n\n-----\n\n'.join(batch)
         batch_insight_prompt = prompt.format(insights=insight_text,
@@ -106,7 +106,7 @@ def extract_insights(insights: List[Insight],
                 print(insight.insight_name)
                 insight.insight_data.append(insight_extraction[insight.citation])
                 insight.insight_text = format_insight_text(insight)
-                insert_insight(insight, conn)
+                # insert_insight(insight, conn)
     return insights
 
 def extract_from_search_document(search_document: SearchDocument,
@@ -132,7 +132,7 @@ def extract_from_search_document(search_document: SearchDocument,
     insights = extract_insights(insights,
                                 search_document=search_document,
                                 prompt=extract_prompt,
-                                conn=conn,
+                                # conn=conn,
                                 batch_size=batch_size,
                                 temperature=temperature,
                                 max_tokens=max_tokens)

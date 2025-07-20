@@ -1,0 +1,23 @@
+[project]
+name = "intelligent-backend"
+version = "0.1.0"
+description = "A backend service combining FastAPI and Apache Burr."
+authors = [{ name = "Your Name", email = "you@example.com" }]
+requires-python = ">=3.9"
+dependencies = [
+    "fastapi",
+    "uvicorn[standard]",
+    "pydantic",
+    "pydantic-settings",
+    "apache-burr==0.8.0", # Pinning version for stability
+    "lancedb",
+    "sqlalchemy", # For SQL interactions
+    "python-dotenv",
+]
+
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
