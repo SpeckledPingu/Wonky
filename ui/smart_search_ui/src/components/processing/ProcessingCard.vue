@@ -7,22 +7,25 @@
       { 'ring-2 ring-offset-2 ring-indigo-500': isSelected }
     ]"
   >
-    <div class="flex justify-between items-start">
+    <div class="flex justify-between items-start gap-4">
       <!-- Content -->
-      <div class="flex-grow mr-4">
+      <!-- --- FIX: Added min-w-0 to allow this flex item to shrink --- -->
+      <div class="flex-grow min-w-0">
+        <!-- --- FIX: Added break-words to handle long titles --- -->
         <h4
-          class="font-bold text-lg text-gray-800 hover:text-indigo-600"
+          class="font-bold text-lg text-gray-800 hover:text-indigo-600 break-words"
         >
           {{ document.title }}
         </h4>
-        <p class="text-sm text-gray-600 mt-1 truncate">
-          {{ (document.content || '').substring(0, 100) }}...
+        <!-- --- FIX: Removed truncate and added break-words for wrapping --- -->
+        <p class="text-sm text-gray-600 mt-1 break-words">
+          {{ (document.summary || (document.content || '')).substring(0, 150) }}...
         </p>
         <div class="mt-3 flex items-center gap-2 flex-wrap">
           <span
             v-for="tag in document.tags"
             :key="tag.id"
-            class="px-2 py-0-5 bg-gray-200 text-gray-700 text-xs font-medium rounded-full"
+            class="px-2 py-0.5 bg-gray-200 text-gray-700 text-xs font-medium rounded-full"
           >
             {{ tag.name }}
           </span>
@@ -30,7 +33,6 @@
       </div>
       <!-- Controls -->
       <div class="flex-shrink-0 flex flex-col items-end space-y-2">
-        <!-- --- FIX: Added @click.stop to explicitly stop the click event --- -->
         <input
           type="checkbox"
           :checked="isSelected"

@@ -46,9 +46,10 @@ class User(Base):
 class Document(Base):
     __tablename__ = "documents"
     id = Column(String, primary_key=True, index=True)
-    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)  # <-- ADDED
+    project_id = Column(Integer, ForeignKey("projects.id"), nullable=False)
     title = Column(String, nullable=False)
     content = Column(Text)
+    summary = Column(Text, nullable=True)  # <-- ADDED
     color = Column(String, default='default')
     
     project = relationship("Project", back_populates="documents")

@@ -5,6 +5,14 @@ import { documentService } from '../services/api';
 import { useNotificationStore } from './notificationStore';
 import { useProjectStore } from './projectStore';
 
+// --- FIX: Configure marked to treat single newlines as <br> tags ---
+// This makes the rendering more flexible for different document formats.
+marked.setOptions({
+  breaks: true, // Still treat single newlines as <br>
+  commonmark: true, // Use the CommonMark specification
+  gfm: true, // Disable GitHub Flavored Markdown for stricter compliance
+});
+
 export const useDocumentStore = defineStore('documents', () => {
   // State
   const activeDocumentId = ref(null);
@@ -45,7 +53,6 @@ export const useDocumentStore = defineStore('documents', () => {
     }
   }
 
-  // --- NEW FUNCTION ---
   function clearState() {
       activeDocumentId.value = null;
       documentsCache.value = {};

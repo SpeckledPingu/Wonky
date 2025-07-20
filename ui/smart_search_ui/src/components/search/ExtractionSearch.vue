@@ -46,20 +46,23 @@
     </div>
     <div>
       <h3 class="font-semibold text-lg text-gray-700 mb-3">Results</h3>
-      <SearchResults :results="formattedResults" @result-click="handleResultClick" />
+      <SearchResults
+        :results="searchResults"
+        @result-click="handleResultClick"
+      />
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, computed } from 'vue';
+import { ref } from 'vue';
 import GuidedSummary from './GuidedSummary.vue';
 import SearchResults from './SearchResults.vue';
 import { useDocumentStore } from '../../stores/documentStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { useSearchStore } from '../../stores/searchStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { searchService } from '../../services/api';
+import { documentService, searchService } from '../../services/api';
 
 const documentStore = useDocumentStore();
 const notificationStore = useNotificationStore();
@@ -67,7 +70,7 @@ const searchStore = useSearchStore();
 const projectStore = useProjectStore();
 
 const searchQuery = ref('');
-const searchResults = ref([]);
+const searchResults = ref([]); // This will now hold RawSearchResult objects
 const isLoading = ref(false);
 
 const contentTypes = ref([
@@ -83,21 +86,10 @@ const stances = ref([
 const selectedContentTypes = ref(['insight', 'policy', 'case_study']);
 const selectedStances = ref(['pro', 'con']);
 
-const formattedResults = computed(() => {
-    return searchResults.value.map(ext => ({
-        id: ext.id,
-        sourceDocId: ext.source_doc_id,
-        title: `[${ext.type.toUpperCase()}] from doc: ${ext.source_doc_id}`,
-        content: ext.content
-    }));
-});
-
 async function performSearch() {
   const projectId = projectStore.activeProjectId;
-  if (!projectId) {
-    notificationStore.addNotification({ message: 'No active project. Please select a project first.', type: 'warning' });
-    return;
-  }
+  if (!projectId) return;
+
   isLoading.value = true;
   searchResults.value = [];
   try {
@@ -108,11 +100,9 @@ async function performSearch() {
         selectedStances.value,
         searchStore.guidingPrompt
     );
-    searchResults.value = response.results;
+    searchResults.value = response.results; // Already in RawSearchResult format
     notificationStore.addNotification({ message: `Found ${response.results.length} extractions.`, type: 'success' });
-
     searchStore.startSummaryPolling(response.searchId);
-
   } catch (error) {
     // Handled by api service
   } finally {
@@ -121,7 +111,22 @@ async function performSearch() {
 };
 
 const handleResultClick = (result) => {
-  // --- FIX: Pass the activeProjectId to the viewDocument action ---
-  documentStore.viewDocument(projectStore.activeProjectId, result.sourceDocId);
+  documentStore.viewDocument(projectStore.activeProjectId, result.id);
 };
+
+async function handleImportClick(resultData) {
+    const projectId = projectStore.activeProjectId;
+    if (!projectId) return;
+
+    try {
+        const importedDoc = await documentService.importDocument(projectId, resultData);
+        notificationStore.addNotification({ message: `"${importedDoc.title}" imported successfully!`, type: 'success' });
+
+        documentStore.viewDocument(projectId, importedDoc.id);
+
+    } catch (error) {
+        // Handled by api service
+    }
+}
+
 </script>

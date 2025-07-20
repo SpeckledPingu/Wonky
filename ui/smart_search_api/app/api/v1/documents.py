@@ -14,7 +14,7 @@ def get_document_by_id(project_id: int, doc_id: str, db: Session = Depends(get_d
     if db_doc:
         return db_doc
     
-    db_report = crud.get_report(db, report_id=doc_id, project_id=project_id, user_id=current_user.id)
+    db_report = crud.get_report(db, report_id=doc_id, project_id=project_id)
     if db_report:
         report_tags = [
             schemas.Tag(id=-1, name='report'),

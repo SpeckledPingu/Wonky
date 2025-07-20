@@ -38,7 +38,11 @@
     <!-- Search Results Section -->
     <div>
       <h3 class="font-semibold text-lg text-gray-700 mb-3">Results</h3>
-      <SearchResults :results="searchResults" @result-click="handleResultClick" />
+      <SearchResults
+        :results="searchResults"
+        @result-click="handleResultClick"
+        @import-click="handleImportClick"
+      />
     </div>
   </div>
 </template>
@@ -51,15 +55,15 @@ import { useDocumentStore } from '../../stores/documentStore';
 import { useNotificationStore } from '../../stores/notificationStore';
 import { useSearchStore } from '../../stores/searchStore';
 import { useProjectStore } from '../../stores/projectStore';
-import { searchService } from '../../services/api';
+import { documentService, searchService } from '../../services/api';
 
 const documentStore = useDocumentStore();
 const notificationStore = useNotificationStore();
 const searchStore = useSearchStore();
 const projectStore = useProjectStore();
 
-const searchQuery = ref('data');
-const searchMode = ref('semantic');
+const searchQuery = ref('AI');
+const searchMode = ref('semantic'); // <-- FIX: This line was missing
 const searchResults = ref([]);
 const isLoading = ref(false);
 
@@ -67,10 +71,6 @@ async function performSearch() {
   const projectId = projectStore.activeProjectId;
   if (!projectId) {
     notificationStore.addNotification({ message: 'No active project. Please select a project first.', type: 'warning' });
-    return;
-  }
-  if (!searchQuery.value.trim()) {
-    notificationStore.addNotification({ message: 'Please enter a search query.', type: 'warning' });
     return;
   }
   isLoading.value = true;
@@ -83,7 +83,6 @@ async function performSearch() {
         searchStore.guidingPrompt
     );
 
-    response.results.forEach(doc => documentStore.upsertDocument(doc));
     searchResults.value = response.results;
 
     notificationStore.addNotification({ message: `Found ${response.results.length} results.`, type: 'success' });
@@ -97,8 +96,22 @@ async function performSearch() {
   }
 };
 
-const handleResultClick = (docId) => {
-  // --- FIX: Pass the activeProjectId to the viewDocument action ---
-  documentStore.viewDocument(projectStore.activeProjectId, docId);
+const handleResultClick = (result) => {
+  documentStore.viewDocument(projectStore.activeProjectId, result.id);
 };
+
+async function handleImportClick(resultData) {
+    const projectId = projectStore.activeProjectId;
+    if (!projectId) return;
+
+    try {
+        const importedDoc = await documentService.importDocument(projectId, resultData);
+        notificationStore.addNotification({ message: `"${importedDoc.title}" imported successfully!`, type: 'success' });
+
+        documentStore.viewDocument(projectId, importedDoc.id);
+
+    } catch (error) {
+        // Handled by api service
+    }
+}
 </script>
