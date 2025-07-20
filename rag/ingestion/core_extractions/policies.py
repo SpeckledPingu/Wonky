@@ -48,7 +48,7 @@ def format_policy_text(policy):
 
 def extract_policies(search_document: SearchDocument,
                      extraction_prompt: str,
-                     conn: sqlite3.Connection,
+                     # conn: sqlite3.Connection,
                      temperature: float = 0.2,
                      max_tokens: int = 10000,
                      citation_prefix='PLCY_',
@@ -74,7 +74,7 @@ def extract_policies(search_document: SearchDocument,
         policy['policy_text'] = format_policy_text(policy)
         policy = Policy(**policy)
         all_policies.append(policy)
-        insert_policy(policy, conn)
+        # insert_policy(policy, conn)
     return all_policies
 
 
@@ -93,7 +93,7 @@ def extract_from_search_document(search_document: SearchDocument,
     """
     policies = extract_policies(search_document=search_document,
                                 extraction_prompt=extract_prompt,
-                                conn=conn,
+                                # conn=conn,
                                 temperature=temperature,
                                 max_tokens=max_tokens,
                                 citation_prefix=citation_prefix,

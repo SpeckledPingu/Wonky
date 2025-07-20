@@ -1,0 +1,31 @@
+version: '3.8'
+
+services:
+  # The FastAPI backend service
+  backend:
+    build: .
+    container_name: intelligent_backend_api
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./src:/app/src # Mount the source code for live reloading
+    environment:
+      # Pass environment variables to the container.
+      # It's best practice to use a .env file for this.
+      - DATABASE_URL=${DATABASE_URL}
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+    command: uvicorn intelligent_backend.main:app --host 0.0.0.0 --port 8000 --reload
+    depends_on:
+      - burr-ui # Ensure the UI starts before the backend tries to connect
+
+  # The Burr Telemetry UI service
+  burr-ui:
+    build: .
+    container_name: burr_telemetry_ui
+    ports:
+      - "7241:7241"
+    command: python src/intelligent_backend/telemetry_server.py
+
+networks:
+  default:
+    driver: bridge
