@@ -4,20 +4,13 @@
       <div
         v-for="result in results"
         :key="result.id"
-        class="bg-white p-4 rounded-lg shadow-sm border flex justify-between items-center"
+        @click="$emit('result-click', result)"
+        class="bg-white p-4 rounded-lg shadow-sm border border-transparent hover:border-blue-500 hover:shadow-md cursor-pointer transition-all"
       >
-        <div @click="$emit('result-click', result)" class="flex-grow cursor-pointer pr-4">
-          <h4 class="font-bold text-blue-700 hover:underline">{{ result.title }}</h4>
-          <p class="text-sm text-gray-600 mt-1">
-            {{ (result.content || result.snippet || '').substring(0, 150) }}...
-          </p>
-        </div>
-        <button
-            @click="$emit('import-click', result)"
-            class="px-4 py-2 bg-green-500 text-white text-sm font-semibold rounded-md hover:bg-green-600 transition-colors shadow flex-shrink-0"
-        >
-            Import
-        </button>
+        <h4 class="font-bold text-blue-700">{{ result.title }}</h4>
+        <p class="text-sm text-gray-600 mt-1">
+          {{ (result.content || result.snippet || '').substring(0, 150) }}...
+        </p>
       </div>
     </div>
     <div v-else class="text-center py-8 px-4 bg-gray-50 rounded-lg">
@@ -37,5 +30,5 @@ defineProps({
   }
 });
 
-defineEmits(['result-click', 'import-click']);
+defineEmits(['result-click']);
 </script>

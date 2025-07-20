@@ -4,60 +4,46 @@ from app.search.base import SearchIndex
 from app.converters import convert_dataframe_to_pydantic
 from sentence_transformers import SentenceTransformer
 import lancedb
-import pandas as pd  # Import pandas for DataFrame creation
-
+import pandas as pd
 from dotenv import load_dotenv
 import os
 from pathlib import Path
-import sqlite3
 
+# Load environment variables to get file paths
 load_dotenv("/Users/jameslittiebrant/DataspellProjects/Mycroft/notebooks/env_var")
-
-# This is a mock implementation. In a real scenario, you would import lancedb
-# and connect to your database here.
-# import lancedb
-data_folder = Path(os.environ['DATA_FOLDER'])
 project_folder = Path(os.environ['PROJECT_FOLDER'])
-research_json_folder = project_folder.joinpath('research_json')
-database_location = project_folder.joinpath('databases')
+index_folder_path = project_folder.joinpath('indexes')
 
-research_database_name = "research.sqlite"
-document_database_name = "documents.sqlite"
-insight_db_sql = 'insights'
-search_result_table_sql = 'search_results'
-metadata_table_sql = 'metadata'
-data_conn = sqlite3.connect(database_location.joinpath(document_database_name))
-research_conn = sqlite3.connect(database_location.joinpath(research_database_name))
-
-index_sr_location = 'crs_reports'
-table_sr_name = 'sections'
-index_folder = project_folder.joinpath(f'indexes/{index_sr_location}')
-
+extraction_index_path = project_folder.joinpath(f'indexes/extractions')
+policies_table_name = 'policies'
+insight_table_name = 'insights'
 
 class LanceDBIndex(SearchIndex):
     """
-    A mock implementation of the SearchIndex that uses a sentence encoder.
+    Implementation of the SearchIndex that connects to real LanceDB indexes.
     """
     
     def __init__(self, encoder: SentenceTransformer):
         """
         The constructor now accepts a sentence encoder model.
         """
-        self.db = lancedb.connect(index_folder)
         self.encoder = encoder
-        print("Initialized Mock LanceDB Index with Sentence Encoder.")
+        print("Initialized LanceDB Index with Sentence Encoder.")
     
     def search_documents(self, project_id: int, query: schemas.SearchQuery) -> List[schemas.RawSearchResult]:
-        print(f"[LanceDB] Encoding query for documents in project {project_id}: '{query.query}'")
+        print(f"[LanceDB] Searching documents in index 'crs_reports' for: '{query.query}'")
+        
+        try:
+            db = lancedb.connect(index_folder_path.joinpath('crs_reports'))
+            table = db.open_table('sections')
+        except Exception as e:
+            print(f"Error connecting to LanceDB or opening table: {e}")
+            return []
         
         query_vector = self.encoder.encode(query.query)
-        print(f"[LanceDB] Query vector created with shape: {query_vector.shape}")
-        
-        table = self.db.open_table(table_sr_name)
         results_df = table.search(query_vector).limit(10).to_pandas()
         
-        # --- FIX: Convert the DataFrame to the RawSearchResult schema ---
-        # This ensures the data is in the correct format before being sent to the CRUD layer.
+        # Use the converter to map the DataFrame to the RawSearchResult schema
         raw_results = convert_dataframe_to_pydantic(
             results_df,
             schemas.RawSearchResult,
@@ -68,17 +54,34 @@ class LanceDBIndex(SearchIndex):
                 'topics': 'tags'
             }
         )
-        print(f"Found {len(raw_results)} raw results from LanceDB.")
+        print(f"Found {len(raw_results)} raw results from LanceDB documents index.")
         return raw_results
     
-    def search_extractions(self, project_id: int, query: schemas.ExtractionSearchQuery) -> List[schemas.Extraction]:
-        print(f"[LanceDB] Encoding query for extractions in project {project_id}: '{query.query}'")
-        
+    def search_extractions(self, project_id: int, query: schemas.ExtractionSearchQuery) -> List[schemas.RawSearchResult]:
+        print(f"[LanceDB] Searching extractions in index 'insights' for: '{query.query}'")
+
+        try:
+            # Connect to the different index for extractions
+            db = lancedb.connect(extraction_index_path)
+            table = db.open_table(insight_table_name)
+        except Exception as e:
+            print(f"Error connecting to LanceDB or opening table: {e}")
+            return []
+
         query_vector = self.encoder.encode(query.query)
-        print(f"[LanceDB] Query vector created with shape: {query_vector.shape}")
+        results_df = table.search(query_vector).limit(10).to_pandas()
+        print(results_df.columns)
         
-        # This part still uses mock data and would need a similar implementation
-        return [
-            schemas.Extraction(id='ext-001', source_doc_id='doc-001', type='insight', stance='pro',
-                               content='LanceDB found an insight about AI.')
-        ]
+        raw_results = convert_dataframe_to_pydantic(
+            results_df,
+            schemas.RawSearchResult,
+            field_mapping={
+                'citation': 'id',
+                'insight_name': 'title',
+                'insight_text': 'content',
+                'insight_type': 'tags'
+            }
+        )
+        
+        print(f"Found and mapped {len(raw_results)} extractions to the common search format.")
+        return raw_results

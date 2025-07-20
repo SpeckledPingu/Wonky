@@ -35,26 +35,11 @@ INSERT INTO projects (id, user_id, name, description) VALUES
 -- Seed `documents`
 -- -----------------------------------------------------
 -- Project 101 (User 1)
-INSERT INTO documents (id, project_id, title, content, color) VALUES
-('doc-001', 101, 'The Impact of AI on Scientific Research', '# AI Research...', 'blue'),
-('doc-006', 101, 'Machine Learning for Financial Data Analysis', '# Machine Learning for Finance...', 'default'),
-('doc-009', 101, 'Genomic Data Sequencing and Analysis', '# Genomic Data...', 'purple');
-
--- Project 102 (User 1)
-INSERT INTO documents (id, project_id, title, content, color) VALUES
-('doc-002', 102, 'Climate Change Policies: A Global Overview', '# Climate Policies...', 'green'),
-('doc-007', 102, 'Renewable Energy Data Report', '# Renewable Energy...', 'green'),
-('doc-008', 102, 'The Ethics of Data Collection', '# Data Ethics...', 'blue');
-
--- Project 201 (User 2)
-INSERT INTO documents (id, project_id, title, content, color) VALUES
-('doc-003', 201, 'Advances in Quantum Computing', '# Quantum Computing...', 'purple'),
-('doc-201', 201, 'A Study on Quantum Entanglement', '# Quantum Entanglement...', 'blue');
-
--- Project 202 (User 2)
-INSERT INTO documents (id, project_id, title, content, color) VALUES
-('doc-004', 202, 'Big Data Analytics in Healthcare', '# Healthcare Data...', 'red'),
-('doc-010', 202, 'Urban Planning with Geospatial Data', '# Urban Planning...', 'red');
+INSERT INTO documents (id, project_id, title, content, summary, color) VALUES
+('doc-001', 101, 'The Impact of AI on Scientific Research', '# AI Research...', 'A summary about the impact of AI on scientific research.', 'blue'),
+('doc-002', 102, 'Climate Change Policies: A Global Overview', '# Climate Policies...', 'This document provides a comprehensive review of international policies aimed at combating climate change.', 'green'),
+('doc-003', 201, 'Advances in Quantum Computing', '# Quantum Computing...', 'A paper discussing the latest breakthroughs in quantum computing.', 'purple'),
+('doc-004', 202, 'Big Data Analytics in Healthcare', '# Healthcare Data...', 'The analysis of patient data presents both opportunities and challenges.', 'red');
 
 -- -----------------------------------------------------
 -- Seed `tags` and `document_tags`

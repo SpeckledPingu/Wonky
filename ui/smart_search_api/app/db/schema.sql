@@ -51,6 +51,7 @@ CREATE TABLE documents (
   project_id INTEGER NOT NULL,
   title TEXT NOT NULL,
   content TEXT,
+  summary TEXT, -- <-- ADDED
   color TEXT DEFAULT 'default',
   created_at DATETIME DEFAULT (CURRENT_TIMESTAMP),
   updated_at DATETIME,

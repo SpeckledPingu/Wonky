@@ -9,12 +9,15 @@ class SearchIndex(ABC):
     """
 
     @abstractmethod
-    def search_documents(self, project_id: int, query: schemas.SearchQuery) -> List[schemas.Document]:
+    def search_documents(self, project_id: int, query: schemas.SearchQuery) -> List[schemas.RawSearchResult]:
         """Searches for documents in the index."""
         pass
 
     @abstractmethod
-    def search_extractions(self, project_id: int, query: schemas.ExtractionSearchQuery) -> List[schemas.Extraction]:
-        """Searches for extractions in the index."""
+    def search_extractions(self, project_id: int, query: schemas.ExtractionSearchQuery) -> List[schemas.RawSearchResult]:
+        """
+        Searches for extractions in the index and returns them in the
+        common RawSearchResult format.
+        """
         pass
 

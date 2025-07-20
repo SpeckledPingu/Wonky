@@ -6,11 +6,13 @@ class BaseSchema(BaseModel):
     model_config = ConfigDict(from_attributes=True)
     
 # --- NEW SCHEMA for raw, untyped search results ---
+class BaseSchema(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
 class RawSearchResult(BaseModel):
     id: str
     title: str
     content: str
-    # Raw results have simple string tags, not Tag objects
     tags: List[str] = []
 
 class Tag(BaseSchema):
@@ -21,6 +23,7 @@ class Document(BaseSchema):
     id: str
     title: str
     content: str
+    summary: Optional[str] = None
     tags: List[Tag] = []
     color: Optional[str] = 'default'
 
@@ -42,7 +45,19 @@ class SearchQuery(BaseModel):
 
 class SearchResponse(BaseModel):
     searchId: str
-    results: List[RawSearchResult] # <-- UPDATED to use the new raw schema
+    results: List[RawSearchResult]
+
+class ExtractionSearchQuery(BaseModel):
+    query: str
+    contentTypes: Optional[List[str]] = []
+    stances: Optional[List[str]] = []
+    guidingPrompt: Optional[str] = None
+
+# The ExtractionSearchResponse is no longer needed as we use the unified SearchResponse
+
+class GuidedSummaryItem(BaseModel):
+    docId: str
+    summary: str
 
 # --- NEW Auth Schemas ---
 class ProjectCreate(BaseModel):

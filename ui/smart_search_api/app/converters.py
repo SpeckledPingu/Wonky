@@ -31,9 +31,10 @@ def convert_dataframe_to_pydantic(
     # Iterate over the records and create Pydantic model instances
     for i, record in enumerate(records):
         # try:
-            
-        record = {k:v for k,v in record.items() if k in model.model_json_schema()['properties'].keys()}
         
+        record = {k:record.get(k, 'Missing Key') for k in record.keys() if k in model.model_json_schema()['properties'].keys()}
+        print(record.keys())
+        print(record)
         # Hardcode overwrite here for now.
         # Refactor this for later on to help with the tags and handling of the tag table
         record['tags'] = list()
